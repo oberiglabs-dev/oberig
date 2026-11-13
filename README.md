@@ -22,14 +22,14 @@ You need a NEAR AI Cloud API key (cloud.near.ai: buy credits, then create a key)
 **PowerShell**
 
 ```powershell
-git clone https://github.com/OWNER/oberig; cd oberig
+git clone https://github.com/oberiglabs-dev/oberig; cd oberig
 $env:NEARAI_API_KEY = "<your key>"; node bin/oberig.js
 ```
 
 **macOS / Linux**
 
 ```sh
-git clone https://github.com/OWNER/oberig && cd oberig
+git clone https://github.com/oberiglabs-dev/oberig && cd oberig
 NEARAI_API_KEY="<your key>" node bin/oberig.js
 ```
 
@@ -310,7 +310,7 @@ Every other path returns 404. Nothing is passed through to any other service.
 - The dashboard is served with a strict Content-Security-Policy and loads no third-party resources.
 - Zero dependencies: only Node.js built-ins (`node:http`, `node:crypto`, `node:fs`).
 
-Found a problem? Open an issue at https://github.com/OWNER/oberig/issues. For anything sensitive, please ask for a private contact first.
+Found a problem? Open an issue at https://github.com/oberiglabs-dev/oberig/issues. For anything sensitive, please ask for a private contact first.
 
 ## Development
 
