@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oberig · session</title>
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230d0c0b'/%3E%3Cg stroke='%23e5412f' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 4l8 8M12 4l-8 8'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+  :root {
+    --night: #0d0c0b; --panel: #161412; --panel2: #1c1916; --line: rgba(241,234,219,.12);
+    --linen: #f1eadb; --dim: #b9b1a2; --mute: #8a8378; --red: #e5412f; --deep: #9e1b14; --gold: #e8b04a;
+    --mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+    --sans: "Fixel Text", Manrope, "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--night); color: var(--linen); font: 15px/1.5 var(--sans); }
+  body { min-height: 100vh; background:
+    radial-gradient(1200px 500px at 70% -10%, rgba(229,65,47,.07), transparent 60%),
+    radial-gradient(900px 400px at 0% 110%, rgba(232,176,74,.05), transparent 60%), var(--night); }
+  a { color: var(--linen); }
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 28px 28px 40px; }
+  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: flex-end; gap: 16px; }
+  .brand canvas { display: block; }
+  .brand .tag { font: 13px/1.3 var(--mono); color: var(--dim); padding-bottom: 6px; }
+  .status { font: 13px/1.75 var(--mono); color: var(--dim); text-align: right; }
+  .status b { color: var(--linen); font-weight: 500; }
+  .ok { color: var(--gold); } .bad { color: var(--red); }
+  .demo { display: inline-block; margin-left: 8px; padding: 0 8px; border: 1px solid var(--line); border-radius: 99px; color: var(--dim); font: 11px/20px var(--mono); }
+  .counters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 26px 0 22px; }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px 14px; }
+  .tile .n { font: 600 34px/1.1 var(--mono); letter-spacing: -.02em; }
+  .tile .l { color: var(--dim); font-size: 13px; margin-top: 4px; }
+  .tile.gold .n { color: var(--gold); } .tile.red .n { color: var(--red); }
+  h2 { font: 500 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); margin: 0 0 10px; display: flex; justify-content: space-between; gap: 12px; }
+  h2 span:last-child { letter-spacing: 0; text-transform: none; color: var(--mute); }
+  .band { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px 18px; overflow: hidden; }
+  .band::before, .band::after { content: ""; position: absolute; left: 0; right: 0; height: 9px; opacity: .9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='9'%3E%3Cg stroke='%23e5412f' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M2 1.5l6 6M8 1.5l-6 6'/%3E%3C/g%3E%3Cg stroke='%239e1b14' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M11 1.5l6 6M17 1.5l-6 6'/%3E%3C/g%3E%3C/svg%3E");
+    background-repeat: repeat-x; }
+  .band::before { top: 6px; } .band::after { bottom: 6px; }
+  .seals { display: flex; gap: 12px; overflow-x: auto; padding: 10px 2px 8px; scroll-behavior: smooth; min-height: 138px; align-items: flex-start; scrollbar-color: #3a342d transparent;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 36px); mask-image: linear-gradient(90deg, transparent 0, #000 36px); }
+  .seal { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 6px; border: 0; padding: 0; background: none; cursor: pointer; border-radius: 6px; }
+  .seal svg { display: block; border-radius: 6px; }
+  .seal .id { font: 11px/1 var(--mono); color: var(--mute); }
+  .seal:hover .id, .seal:focus-visible .id, .seal.sel .id { color: var(--gold); }
+  .seal.sel svg { box-shadow: 0 0 0 2px var(--gold); }
+  .empty { color: var(--dim); font-size: 14px; padding: 18px 8px; line-height: 1.7; }
+  .empty code { font-family: var(--mono); color: var(--linen); background: var(--panel2); padding: 1px 6px; border-radius: 4px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; margin-top: 22px; }
+  .grid > * { min-width: 0; }
+  .tbl { overflow-x: auto; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  table { width: 100%; border-collapse: collapse; font: 13px/1.4 var(--mono); }
+  th { text-align: left; font-weight: 500; color: var(--mute); padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 7px 8px; border-bottom: 1px solid rgba(241,234,219,.06); white-space: nowrap; color: var(--dim); }
+  tr[data-id] { cursor: pointer; } tr[data-id]:hover td, tr.sel td { background: rgba(241,234,219,.04); color: var(--linen); }
+  td.v { color: var(--linen); }
+  .receipt { font: 13px/1.6 var(--mono); }
+  .receipt .head { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+  .receipt .head svg { border-radius: 6px; flex: 0 0 auto; }
+  .receipt .title { color: var(--linen); font-size: 14px; }
+  .receipt dl { display: grid; grid-template-columns: 104px 1fr; gap: 2px 10px; margin: 0; }
+  .receipt dt { color: var(--mute); } .receipt dd { margin: 0; color: var(--linen); overflow-wrap: anywhere; }
+  .note { color: var(--mute); font-size: 12px; margin-top: 12px; line-height: 1.5; }
+  footer { margin-top: 26px; color: var(--mute); font: 12px/1.6 var(--mono); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  @media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } .counters { grid-template-columns: repeat(2, 1fr); } .status { text-align: left; } }
+  @media (max-width: 520px) { .wrap { padding: 18px 16px 32px; } .tile .n { font-size: 26px; } .receipt dl { grid-template-columns: 84px minmax(0, 1fr); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><canvas id="mark" width="10" height="10" aria-label="oberig" role="img"></canvas><div class="tag">your agent's amulet<span id="demo"></span></div></div>
+    <div class="status" id="status" aria-live="polite">connecting to the gateway…</div>
+  </header>
+
+  <section class="counters" aria-label="Session counters">
+    <div class="tile gold"><div class="n" id="c-verified">0</div><div class="l">verified answers</div></div>
+    <div class="tile red"><div class="n" id="c-secrets">0</div><div class="l">secrets kept home</div></div>
+    <div class="tile red"><div class="n" id="c-stopped">0</div><div class="l">hidden instructions stopped</div></div>
+    <div class="tile"><div class="n" id="c-scrubbed">0</div><div class="l">traces scrubbed</div></div>
+  </section>
+
+  <h2><span>Rushnyk of this session</span><span id="band-count">0 seals</span></h2>
+  <div class="band"><div class="seals" id="seals" role="list" aria-label="Seals, one per request"></div></div>
+
+  <div class="grid">
+    <div class="card">
+      <h2><span>Requests</span><span>metadata only</span></h2>
+      <div class="tbl"><table>
+        <thead><tr><th>time</th><th>client</th><th>check</th><th>masked</th><th>stopped</th><th>status</th><th>took</th><th>seal</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table></div>
+    </div>
+    <div class="card receipt" id="receipt" aria-live="polite"></div>
+  </div>
+
+  <footer>
+    <span>Runs only on this computer · stores nothing · no telemetry</span>
+    <span>This page shows metadata, never prompt or answer text.</span>
+  </footer>
+</div>
+
+<script src="/_oberig/seal.js"></script>
+<script src="/_oberig/stitch.js"></script>
+<script>
+(function () {
+  'use strict';
+  var Seal = window.OberigSeal, St = window.OberigStitch;
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var params = new URLSearchParams(location.search);
+  var demo = params.has('demo');
+  var state = { receipts: [], counters: {}, attestation: null, model: '', guards: {} };
+  var selected = null;
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var short = function (a) { a = String(a || '').replace(/^0x/i, '').toLowerCase(); return a ? '0x' + a.slice(0, 4) + '…' + a.slice(-4) : 'none'; };
+  var hms = function (t) { var d = new Date(t); return [d.getHours(), d.getMinutes(), d.getSeconds()].map(function (n) { return String(n).padStart(2, '0'); }).join(':'); };
+  var VERDICT = { verified: ['✓ verified', 'ok'], attested: ['✓ attested', 'ok'], 'bad-signature': ['✗ bad signature', 'bad'], refused: ['✗ refused', 'bad'], error: ['✗ error', 'bad'], unverified: ['✗ unverified', 'bad'] };
+
+  // Wordmark, stitched once on load.
+  function drawMark() {
+    var c = $('mark'), cell = window.innerWidth < 520 ? 4 : 6;
+    var m = St.measure('oberig', { cell: cell }), dpr = window.devicePixelRatio || 1, pad = cell;
+    c.width = Math.ceil((m.width + pad * 2) * dpr); c.height = Math.ceil((m.height + pad * 2) * dpr);
+    c.style.width = (m.width + pad * 2) + 'px'; c.style.height = (m.height + pad * 2) + 'px';
+    var ctx = c.getContext('2d');
+    var t0 = performance.now(), dur = 1600;
+    function frame(now) {
+      var p = reduce ? 1 : Math.min(1, (now - t0) / dur);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, c.width, c.height);
+      St.drawText(ctx, 'oberig', { x: pad, y: pad, cell: cell, theme: 'night', progress: p, needle: p < 1 });
+      if (p < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function renderStatus() {
+    var a = state.attestation, g = state.guards || {};
+    var ver = !a ? 'checking…' : a.ok ? '<span class="ok">✓</span> enclave attested · signer <b>' + esc(short(a.signer)) + '</b>' : '<span class="bad">✗</span> not attested · ' + esc(a.error || '');
+    $('status').innerHTML =
+      'Enclave&nbsp; <b>NEAR AI · ' + esc(state.model) + '</b><br>' +
+      'Verified ' + ver + '<br>' +
+      'Guards&nbsp;&nbsp; mask ' + (g.mask === false ? 'off' : 'on') + ' · shield ' + (g.shield === 'block' || !g.shield ? 'on' : esc(g.shield)) + ' · seals on';
+  }
+
+  function renderCounters() {
+    var c = state.counters || {};
+    $('c-verified').textContent = c.verifiedAnswers || 0;
+    $('c-secrets').textContent = c.secretsKeptHome || 0;
+    $('c-stopped').textContent = c.hiddenStopped || 0;
+    $('c-scrubbed').textContent = c.tracesScrubbed || 0;
+  }
+
+  function sealSvg(r, p, cell) { return Seal.svg(r.hash, { bg: 'night', cell: cell || 5, pad: 4, progress: p }); }
+
+  function addSeal(r, animate) {
+    var b = document.createElement('button');
+    b.className = 'seal'; b.type = 'button'; b.setAttribute('role', 'listitem');
+    b.setAttribute('aria-label', 'Seal ' + r.id + ', ' + (VERDICT[r.verdict] || [r.verdict])[0] + ', ' + hms(r.time));
+    b.dataset.id = r.hash;
+    b.innerHTML = sealSvg(r, animate && !reduce ? 0 : 1) + '<span class="id">' + esc(r.id) + '</span>';
+    b.addEventListener('mouseenter', function () { showReceipt(r); });
+    b.addEventListener('focus', function () { showReceipt(r); });
+    b.addEventListener('click', function () { selected = r.hash; showReceipt(r); });
+    var list = $('seals');
+    var empty = list.querySelector('.empty'); if (empty) empty.remove();
+    list.appendChild(b);
+    list.scrollLeft = list.scrollWidth;
+    if (animate && !reduce) {
+      var t0 = performance.now(), dur = 1300;
+      (function step(now) {
+        var p = Math.min(1, (now - t0) / dur);
+        b.querySelector('svg').outerHTML = sealSvg(r, p);
+        if (p < 1) requestAnimationFrame(step);
+      })(t0);
+    }
+    $('band-count').textContent = list.querySelectorAll('.seal').length + ' seal' + (list.querySelectorAll('.seal').length === 1 ? '' : 's');
+  }
+
+  function renderRows() {
+    var rows = state.receipts.slice(0, 40).map(function (r) {
+      var v = VERDICT[r.verdict] || [r.verdict, ''];
+      return '<tr data-id="' + esc(r.hash) + '"' + (selected === r.hash ? ' class="sel"' : '') + '><td>' + hms(r.time) + '</td><td class="v">' + esc(r.client) + '</td><td class="' + v[1] + '">' + esc(v[0]) +
+        '</td><td>' + ((r.masked && r.masked.total) || 0) + '</td><td>' + ((r.shield && r.shield.stopped) || 0) + '</td><td>' + esc(r.status) +
+        '</td><td>' + ((r.ms || 0) / 1000).toFixed(1) + 's</td><td class="v">' + esc(r.id) + '</td></tr>';
+    });
+    $('rows').innerHTML = rows.join('') || '<tr><td colspan="8">no requests yet</td></tr>';
+  }
+
+  function sigText(s) {
+    if (!s || s.status === 'none') return 'not checked';
+    if (s.status === 'verified') return '✓ verified · ' + (s.kind === 'provider_tee' ? 'model TEE key' : 'gateway key');
+    if (s.status === 'failed') return '✗ ' + (s.reason || 'failed');
+    return 'unavailable' + (s.reason ? ' · ' + s.reason : '');
+  }
+
+  function showReceipt(r) {
+    if (!r) {
+      $('receipt').innerHTML = '<h2><span>Receipt</span></h2><div class="empty">Hover or select a seal to read its receipt.</div>';
+      return;
+    }
+    var kinds = r.masked && r.masked.kinds ? Object.keys(r.masked.kinds).map(function (k) { return k.toLowerCase() + ' ' + r.masked.kinds[k]; }).join(' · ') : '';
+    var a = r.attestation || {};
+    var v = VERDICT[r.verdict] || [r.verdict, ''];
+    $('receipt').innerHTML = '<h2><span>Receipt</span><span>seal ' + esc(r.id) + '</span></h2>' +
+      '<div class="head">' + sealSvg(r, 1, 4) + '<div><div class="title">' + esc(r.client) + ' → near</div><div class="' + v[1] + '">' + esc(v[0]) + '</div><div style="color:var(--mute)">' + new Date(r.time).toLocaleString() + '</div></div></div>' +
+      '<dl>' +
+      '<dt>model</dt><dd>' + esc(r.model) + '</dd>' +
+      '<dt>enclave</dt><dd>' + (a.ok ? '✓ attested · ' + esc(short(a.signer)) : r.attestation ? '✗ not attested' + (a.error ? ' · ' + esc(a.error) : '') : 'not checked for this request') + '</dd>' +
+      '<dt>signature</dt><dd>' + esc(sigText(r.signature)) + '</dd>' +
+      '<dt>masked</dt><dd>' + ((r.masked && r.masked.total) || 0) + (kinds ? ' · ' + esc(kinds) : '') + '</dd>' +
+      '<dt>shield</dt><dd>' + ((r.shield && r.shield.stopped) || 0) + ' ' + (r.shield && r.shield.mode === 'warn' ? 'flagged' : 'stopped') + (r.shield && r.shield.rules && r.shield.rules.length ? ' · ' + esc(r.shield.rules.join(', ')) : '') + '</dd>' +
+      '<dt>request</dt><dd>sha256 ' + esc(String(r.requestHash || '').slice(0, 16)) + '…</dd>' +
+      '<dt>response</dt><dd>sha256 ' + esc(String(r.responseHash || '').slice(0, 16)) + '…</dd>' +
+      '<dt>status</dt><dd>' + esc(r.status) + ' · ' + ((r.ms || 0) / 1000).toFixed(1) + 's' + (r.tokens ? ' · ' + (r.tokens.in || 0) + ' in / ' + (r.tokens.out || 0) + ' out' : '') + '</dd>' +
+      '<dt>receipt</dt><dd>sha256 ' + esc(String(r.hash).slice(0, 16)) + '…</dd>' +
+      '</dl>' +
+      '<div class="note">The hashes cover the exact bytes sent to and received from NEAR AI (after masking). All instances of a model share one signing key, so a signer match shows the attested key signed the answer, not which machine.</div>';
+  }
+
+  function emptyBand() {
+    $('seals').innerHTML = '<div class="empty">No requests yet. Point your agent at <code>' + esc(location.origin) + '</code> (run <code>oberig setup</code> for the exact lines). Each answer adds a seal here.</div>';
+  }
+
+  function load(snap) {
+    state.model = snap.model; state.guards = snap.guards || {}; state.attestation = snap.attestation; state.counters = snap.counters || {};
+    state.receipts = snap.receipts || [];
+    $('seals').innerHTML = '';
+    if (!state.receipts.length) emptyBand();
+    state.receipts.slice().reverse().forEach(function (r) { addSeal(r, false); });
+    renderStatus(); renderCounters(); renderRows(); showReceipt(state.receipts[0]);
+  }
+
+  function onReceipt(r, counters) {
+    state.receipts.unshift(r); if (state.receipts.length > 200) state.receipts.pop();
+    if (counters) state.counters = counters;
+    addSeal(r, true); renderCounters(); renderRows();
+    if (!selected) showReceipt(r);
+  }
+
+  $('rows').addEventListener('click', function (e) {
+    var tr = e.target.closest('tr[data-id]'); if (!tr) return;
+    selected = tr.dataset.id;
+    var r = state.receipts.find(function (x) { return x.hash === selected; });
+    showReceipt(r); renderRows();
+    document.querySelectorAll('.seal').forEach(function (s) { s.classList.toggle('sel', s.dataset.id === selected); });
+  });
+
+  drawMark();
+  window.addEventListener('resize', function () { clearTimeout(drawMark.t); drawMark.t = setTimeout(drawMark, 200); });
+
+  if (demo) {
+    // Demo data for screenshots: clearly labelled, generated in the page, nothing is sent.
+    $('demo').innerHTML = '<span class="demo">demo data</span>';
+    var clients = ['claude-code', 'claude-code', 'codex', 'opencode', 'claude-code'];
+    var hex = function (i) { var s = ''; var x = (i + 1) * 2654435761 >>> 0; for (var k = 0; k < 64; k++) { x = (x * 1103515245 + 12345 + k) >>> 0; s += (x >>> 24 & 15).toString(16); } return s; };
+    var now = Date.now(), n = Number(params.get('demo')) || 14, list = [];
+    for (var i = 0; i < n; i++) {
+      var h = hex(i);
+      list.unshift({ hash: h, id: h.slice(0, 4), time: now - (n - i) * 47000, client: clients[i % clients.length], model: 'deepseek-ai/DeepSeek-V4.1-Flash-1017',
+        verdict: i === 6 ? 'attested' : 'verified', status: 200, ms: 900 + (i * 377) % 2400,
+        masked: { total: [2, 0, 1, 0, 3, 0, 1][i % 7], kinds: [{ SECRET: 1, EMAIL: 1 }, {}, { SECRET: 1 }, {}, { SECRET: 2, CARD: 1 }, {}, { PHONE: 1 }][i % 7] },
+        shield: { mode: 'block', stopped: i === 4 || i === 9 ? 1 : 0, rules: i === 4 ? ['html-comment'] : i === 9 ? ['unicode-tags'] : [] },
+        attestation: { ok: true, signer: '236f5a6b91dd47dc3b7b36e43d4eb531a042ffb8f8fbf3a1555b78cef4fdda4c' },
+        signature: i === 6 ? { status: 'unavailable', reason: 'signature not found' } : { status: 'verified', kind: 'provider_tee' },
+        requestHash: hex(i + 100), responseHash: hex(i + 200), tokens: { in: 1200 + i * 310, out: 90 + i * 17 } });
+    }
+    load({ model: 'deepseek-ai/DeepSeek-V4.1-Flash-1017', guards: { mask: true, shield: 'block' },
+      attestation: { ok: true, signer: '236f5a6b91dd47dc3b7b36e43d4eb531a042ffb8f8fbf3a1555b78cef4fdda4c' },
+      counters: { verifiedAnswers: n - 1, secretsKeptHome: 6, hiddenStopped: 2, tracesScrubbed: 3 }, receipts: list });
+    return;
+  }
+
+  fetch('/_oberig/state').then(function (r) { return r.json(); }).then(load).catch(function () { $('status').textContent = 'gateway not reachable'; emptyBand(); });
+  var es = new EventSource('/_oberig/events');
+  es.addEventListener('receipt', function (e) { var d = JSON.parse(e.data); onReceipt(d.receipt, d.counters); });
+  es.addEventListener('attestation', function (e) { state.attestation = JSON.parse(e.data); renderStatus(); });
+  es.addEventListener('counters', function (e) { state.counters = JSON.parse(e.data); renderCounters(); });
+  es.onerror = function () { $('status').innerHTML = 'gateway disconnected · reconnecting…'; };
+  es.onopen = function () { renderStatus(); };
+})();
+</script>
+</body>
+</html>

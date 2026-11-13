@@ -1,0 +1,38 @@
+{
+  "name": "oberig",
+  "version": "0.1.0",
+  "description": "A small local guard between your coding agent and NEAR AI Cloud: verifies the enclave, masks secrets, stops hidden instructions and seals every answer.",
+  "license": "MIT",
+  "bin": {
+    "oberig": "bin/oberig.js"
+  },
+  "main": "src/server.js",
+  "files": [
+    "bin/",
+    "src/",
+    "dashboard/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node bin/oberig.js",
+    "test": "node --test test/"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "keywords": [
+    "near-ai",
+    "tee",
+    "attestation",
+    "claude-code",
+    "codex",
+    "opencode",
+    "prompt-injection",
+    "privacy"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OWNER/oberig"
+  }
+}

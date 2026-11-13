@@ -1,0 +1,211 @@
+/* Oberig site scenes. Pairs with scenes.js. */
+
+.scene {
+  --sc-night: #0d0c0b;
+  --sc-panel: #161412;
+  --sc-line: rgba(241, 234, 219, 0.12);
+  --sc-linen: #f1eadb;
+  --sc-dim: #b9b1a2;
+  --sc-mute: #8a8377;
+  --sc-red: #e5412f;
+  --sc-red-text: #f0604c;
+  --sc-gold: #e8b04a;
+  --sc-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+.scene-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.scene-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Default sizes. A page can set its own height on the scene; the drawing adapts. */
+.scene[data-scene="hero"] { aspect-ratio: 1 / 1.04; max-height: min(80vh, 700px); }
+.scene[data-scene="verify"] { aspect-ratio: 5 / 4.4; max-height: min(66vh, 560px); min-height: 400px; }
+.scene[data-scene="mask"] { aspect-ratio: 5 / 4.3; max-height: min(66vh, 560px); min-height: 400px; }
+.scene[data-scene="seal"] { height: clamp(170px, 24vh, 236px); }
+.scene[data-scene="scrub"] { aspect-ratio: 16 / 10; max-height: min(44vh, 380px); min-height: 300px; }
+.scene[data-scene="shield"] { container-type: inline-size; }
+@media (max-width: 820px) {
+  .scene[data-scene="hero"] { aspect-ratio: 1 / 1.42; max-height: none; }
+  .scene[data-scene="verify"], .scene[data-scene="mask"] { aspect-ratio: auto; height: 440px; max-height: none; min-height: 0; }
+  .scene[data-scene="mask"] { height: 420px; }
+  .scene[data-scene="scrub"] { aspect-ratio: auto; height: 330px; max-height: none; }
+  .scene[data-scene="seal"] { height: 168px; }
+}
+
+/* Cards (hero receipt, seal tooltip) */
+.scene-card {
+  font: 12.5px/1.6 var(--sc-mono);
+  color: var(--sc-linen);
+  background: rgba(22, 20, 18, 0.95);
+  border: 1px solid var(--sc-line);
+  border-radius: 10px;
+  padding: 12px 16px 13px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+.scene-card .sc-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sc-mute);
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(241, 234, 219, 0.07);
+}
+.scene-card .sc-line { min-height: 1.6em; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.sc-k { color: var(--sc-linen); }
+.sc-d { color: var(--sc-mute); }
+.sc-g { color: var(--sc-gold); }
+.sc-r { color: var(--sc-red-text); }
+.sc-caret {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.05em;
+  margin-left: 1px;
+  vertical-align: -0.17em;
+  background: var(--sc-red);
+  opacity: 0.85;
+}
+
+.hero-card {
+  position: absolute;
+  right: 0;
+  bottom: 3%;
+  width: min(324px, 60%);
+  font-size: 12px;
+  padding: 11px 14px 12px;
+  will-change: transform;
+}
+.hero-card .hero-seal { margin-top: 2px; }
+@media (max-width: 820px) {
+  .hero-card { left: 0; right: 0; bottom: 0; width: auto; font-size: 12px; }
+}
+@media (max-width: 380px) {
+  .hero-card { font-size: 11px; padding: 10px 12px; }
+}
+
+/* Seal band */
+.scene[data-scene="seal"] { overflow: visible; }
+.scene[data-scene="seal"].band-linen .scene-canvas { border-radius: 4px; }
+.band-hits { position: absolute; inset: 0; }
+.band-hit {
+  position: absolute;
+  left: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.band-hit:focus { outline: none; }
+.band-hit:focus-visible { outline: 2px solid var(--sc-gold); outline-offset: 2px; }
+.band-tip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 6;
+  width: 262px;
+  pointer-events: none;
+}
+.band-tip[hidden] { display: none; }
+
+/* Shield: README stage and the "Paste anything" box */
+.shield-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.shield-stage { position: relative; height: 430px; min-width: 0; }
+@container (min-width: 760px) {
+  .shield-grid:not(.shield-solo) { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 22px; align-items: stretch; }
+  .shield-stage { height: auto; min-height: 420px; }
+}
+@container (max-width: 420px) {
+  .shield-stage { height: 470px; }
+}
+
+.paste {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--sc-line);
+  border-radius: 10px;
+  background: var(--sc-panel);
+  color: var(--sc-linen);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.paste-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.paste-head label { font-weight: 600; font-size: 15px; color: var(--sc-linen); }
+.paste-try {
+  font: 500 12.5px/1 var(--sc-mono);
+  color: var(--sc-linen);
+  background: transparent;
+  border: 1px solid rgba(241, 234, 219, 0.22);
+  border-radius: 999px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+.paste-try:hover { border-color: var(--sc-red); color: #fff; }
+.paste-try:focus-visible, .paste textarea:focus-visible { outline: 2px solid var(--sc-gold); outline-offset: 2px; }
+.paste textarea {
+  width: 100%;
+  min-height: 132px;
+  resize: vertical;
+  box-sizing: border-box;
+  font: 12.5px/1.55 var(--sc-mono);
+  color: var(--sc-linen);
+  background: var(--sc-night);
+  border: 1px solid var(--sc-line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.paste textarea::placeholder { color: var(--sc-mute); }
+.paste-status { font: 500 13px/1.4 var(--sc-mono); color: var(--sc-dim); min-height: 1.4em; }
+.paste-status.is-bad { color: var(--sc-red-text); }
+.paste-status.is-ok { color: var(--sc-gold); }
+.paste-status.is-wait { color: var(--sc-mute); }
+.paste-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 236px; overflow: auto; }
+.paste-list li {
+  font-size: 13px;
+  color: var(--sc-dim);
+  padding: 7px 10px;
+  border-left: 2px solid var(--sc-red);
+  background: rgba(229, 65, 47, 0.06);
+  border-radius: 0 6px 6px 0;
+  overflow-wrap: anywhere;
+}
+.paste-kind { font: 600 12px/1.4 var(--sc-mono); color: var(--sc-red-text); }
+.paste-list code {
+  display: block;
+  margin-top: 3px;
+  font: 12px/1.45 var(--sc-mono);
+  color: var(--sc-linen);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.paste-note { margin: 0; font-size: 12.5px; color: var(--sc-mute); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-card { transform: none !important; }
+}
