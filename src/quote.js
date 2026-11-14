@@ -5,7 +5,7 @@
 //   the PCK leaf certificate signs the QE report,
 //   and the PCK chain ends at the pinned Intel SGX Root CA.
 // Pure node:crypto. What this does NOT do: TCB status, QE identity and CRLs
-// (those need Intel PCS collateral, see verify.js and OBERIG_VERIFY=full).
+// (those need Intel PCS collateral, see pcs.js and OBERIG_VERIFY=full).
 
 const crypto = require('node:crypto');
 
@@ -47,6 +47,8 @@ function parseQuote(input) {
     attKeyType,
     teeType,
     teeTcbSvn: b.subarray(0, 16),
+    mrSignerSeam: b.subarray(64, 112),
+    seamAttributes: b.subarray(112, 120),
     tdAttributes: b.subarray(120, 128),
     mrTd: b.subarray(136, 184),
     mrConfigId: b.subarray(184, 232),
@@ -133,10 +135,10 @@ function verifyQuoteChain(quote, opts = {}) {
     const qeOk = crypto.verify('sha256', q.qeReport, { key: leaf.publicKey, dsaEncoding: 'ieee-p1363' }, q.qeReportSignature);
     if (!step('QE report signed by PCK leaf', qeOk)) return { ok: false, steps, error: 'QE report signature does not verify' };
 
-    return { ok: true, steps, leafPem: pems[0] };
+    return { ok: true, steps, pems: pems.slice(0, 3) };
   } catch (err) {
     return { ok: false, steps, error: 'quote chain check failed: ' + err.message };
   }
 }
 
-module.exports = { parseQuote, verifyQuoteChain, INTEL_ROOT_SHA256, hexBuf, b64url, SIGNED_LEN };
+module.exports = { parseQuote, verifyQuoteChain, splitPem, INTEL_ROOT_SHA256, hexBuf, b64url, SIGNED_LEN };

@@ -28,7 +28,7 @@ function banner(state, color = false) {
   const { cfg, attestation: a } = state;
   const x = k.red('×');
   let verified;
-  if (a && a.ok) verified = `${k.gold('✓')} enclave attested · signer ${shortSigner(a.signer)}`;
+  if (a && a.ok) verified = `${k.gold('✓')} enclave attested · signer ${shortSigner(a.signer)}${a.tcb && a.tcb.model ? ` · Intel TCB ${a.tcb.model}` : ''}`;
   else if (a) verified = `${k.red('✗')} not attested · ${a.error || 'check failed'}`;
   else verified = 'checking…';
   const guard = (name, on, word) => `${name} ${on ? 'on' : word || 'off'}`;
@@ -81,6 +81,7 @@ function enclaveReceipt(rec, opts = {}) {
   const row = (key, val) => out.push(`  ${pad(key, 10)}${val}`);
   row('model', a.model || '');
   row('service', 'NEAR AI Cloud · provider near');
+  if (a.mode) row('mode', a.mode === 'full' ? 'full · Intel PCS collateral and NVIDIA NRAS checked here' : 'local · only NEAR AI contacted');
   row('time', new Date(rec.time).toISOString().replace('T', ' ').slice(0, 19) + ' UTC');
   if (a.nonce) row('nonce', `${a.nonce.slice(0, 8)}…${a.nonce.slice(-8)} · fresh, 32 bytes`);
   if (a.signer) row('signer', `${shortSigner(a.signer)} · ${a.algo || ''}`);
@@ -88,7 +89,7 @@ function enclaveReceipt(rec, opts = {}) {
   out.push('');
   for (const c of a.checks || []) {
     if (c.status === 'ok') out.push(`  ${k.gold('✓')}  ${c.label}${c.detail && opts.details ? k.dim('  ' + c.detail) : ''}`);
-    else if (c.status === 'fail') out.push(`  ${k.red('✗')}  ${c.label}${c.detail ? k.dim('  ' + c.detail) : ''}`);
+    else if (c.status === 'fail' || c.status === 'warn') out.push(`  ${k.red('✗')}  ${c.label}${c.detail ? k.dim('  ' + c.detail) : ''}`);
     else out.push(`  ·  ${c.label}: ${c.detail || 'not checked locally'}`);
   }
   if (!(a.checks || []).length && a.error) out.push(`  ${k.red('✗')}  ${a.error}`);

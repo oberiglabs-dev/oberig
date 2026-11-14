@@ -119,7 +119,7 @@ function createGateway(cfg, deps = {}) {
     if (!a) return null;
     return {
       ok: !!a.ok, model: a.model, signer: a.signer || null, gatewaySigner: a.gatewaySigner || null, algo: a.algo || null,
-      nonce: a.nonce || null, fetchedAt: a.fetchedAt || null, error: a.error || null, mode: a.mode || cfg.verifyMode,
+      nonce: a.nonce || null, fetchedAt: a.fetchedAt || null, error: a.error || null, mode: a.mode || cfg.verifyMode, tcb: a.tcb || null,
       checks: (a.checks || []).map((c) => ({ label: c.label, status: c.status, detail: c.detail })),
     };
   }
@@ -187,6 +187,7 @@ function createGateway(cfg, deps = {}) {
 
     const a = await ensureAttestation();
     rec.attestation = { ok: !!a.ok, signer: a.signer || null, gatewaySigner: a.gatewaySigner || null, algo: a.algo || null, nonce: a.nonce || null, fetchedAt: a.fetchedAt || null, mode: cfg.verifyMode };
+    if (a.tcb) rec.attestation.tcb = a.tcb;
     if (!a.ok && cfg.requireAttestation) {
       return fail(503, `Oberig: the NEAR AI enclave check failed (${a.error || 'unknown reason'}). Nothing was sent. Run "oberig verify" for details.`);
     }

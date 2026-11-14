@@ -39,7 +39,9 @@ Environment
   OBERIG_PORT                default 8790
   OBERIG_SHIELD              block | warn | off (default block)
   OBERIG_REQUIRE_ATTESTATION 1 | 0 (default 1: nothing is sent unless the check passes)
-  OBERIG_VERIFY              local | full (full adds the NVIDIA GPU verdict)
+  OBERIG_VERIFY              local | full (full adds Intel TCB status, QE identity
+                             and CRLs from Intel PCS, and the NVIDIA GPU verdict)
+  OBERIG_REQUIRE_TCB         warn | uptodate (full mode: refuse unless UpToDate)
   More in the README.
 `;
 
@@ -114,7 +116,7 @@ async function cmdVerify(args) {
   }
   const rec = R.seal({
     kind: 'enclave-receipt', time: Date.now(),
-    attestation: { model: a.model, ok: !!a.ok, nonce: a.nonce, signer: a.signer, gatewaySigner: a.gatewaySigner, algo: a.algo, error: a.error || null, checks: (a.checks || []).map((c) => ({ label: c.label, status: c.status, detail: c.detail })) },
+    attestation: { model: a.model, ok: !!a.ok, nonce: a.nonce, signer: a.signer, gatewaySigner: a.gatewaySigner, algo: a.algo, mode: cfg.verifyMode, tcb: a.tcb, error: a.error || null, checks: (a.checks || []).map((c) => ({ label: c.label, status: c.status, detail: c.detail })) },
     chat: chat ? { status: chat.status, kind: chat.kind || null, reason: chat.reason || null } : null,
   });
   if (args.json) process.stdout.write(JSON.stringify({ ...rec, attestation: { ...rec.attestation, gateway: undefined } }, null, 2) + '\n');
