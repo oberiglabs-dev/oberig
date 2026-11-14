@@ -11,6 +11,7 @@ const { VERSION } = require('./config.js');
 const M = require('./mask.js');
 const Shield = require('./shield.js');
 const T = require('./translate.js');
+const RS = require('./responses.js');
 const S = require('./streams.js');
 const V = require('./verify.js');
 const R = require('./receipt.js');
@@ -38,6 +39,7 @@ function errorBody(route, status, message) {
     const type = status === 401 ? 'authentication_error' : status === 400 ? 'invalid_request_error' : status === 429 ? 'rate_limit_error' : status === 503 ? 'overloaded_error' : 'api_error';
     return { type: 'error', error: { type, message } };
   }
+  if (route === 'responses') return { error: { message, type: 'oberig_error', code: RS.errorCode(status, message) } };
   return { error: { message, type: 'oberig_error', code: status } };
 }
 
@@ -189,8 +191,22 @@ function createGateway(cfg, deps = {}) {
       return fail(503, `Oberig: the NEAR AI enclave check failed (${a.error || 'unknown reason'}). Nothing was sent. Run "oberig verify" for details.`);
     }
 
+    // Codex speaks the Responses API. Turn it into Chat Completions first, so the shield,
+    // the mask and the signature check work exactly as they do for the other agents.
+    let source = body;
+    let rctx = null;
+    if (route === 'responses') {
+      try {
+        const t = RS.responsesToChat(body, cfg.model, { maxTokens: cfg.maxTokens });
+        source = t.request;
+        rctx = t.ctx;
+      } catch (err) {
+        return fail(err.status || 400, `Oberig: ${err.message}`);
+      }
+    }
+
     // Shield, then mask. Both work on a copy; the client's body is never sent as is.
-    const sh = shieldBody(body, route, cfg.shield);
+    const sh = shieldBody(source, route === 'responses' ? 'chat' : route, cfg.shield);
     for (const p of sh.prints) stoppedSeen.add(p);
     rec.shield = { mode: cfg.shield, stopped: sh.stopped, rules: [...sh.rules] };
     const report = M.newReport();
@@ -216,6 +232,7 @@ function createGateway(cfg, deps = {}) {
     const streamError = (status, message) => {
       rec.status = status;
       if (route === 'messages') res.write(S.formatSSE({ event: 'error', data: errorBody(route, status, message) }));
+      else if (route === 'responses') res.write(S.formatSSE(RS.failedEvent(status, message, cfg.model)));
       else res.write(S.formatSSE({ data: errorBody(route, status, message) }));
       res.end();
     };
@@ -261,6 +278,19 @@ function createGateway(cfg, deps = {}) {
           }
           write(tr.end());
           rec.tokens = { in: tr.usage.input_tokens, out: tr.usage.output_tokens };
+        } else if (route === 'responses') {
+          const restore = S.openaiRestorer(vault);
+          const tr = RS.createStreamTranslator(rctx);
+          const write = (evs) => { for (const e of evs) res.write(S.formatSSE(e)); };
+          for await (const e of S.readSSE(r.body, (c) => raw.push(Buffer.from(c)))) {
+            if (e.data === '[DONE]') continue;
+            let chunk;
+            try { chunk = JSON.parse(e.data); } catch { continue; }
+            if (chunk.id && !completionId) completionId = chunk.id;
+            if (chunk.usage) rec.tokens = { in: chunk.usage.prompt_tokens || 0, out: chunk.usage.completion_tokens || 0 };
+            write(tr.push(restore(chunk)));
+          }
+          write(tr.end());
         } else {
           const restore = S.openaiRestorer(vault);
           for await (const e of S.readSSE(r.body, (c) => raw.push(Buffer.from(c)))) {
@@ -293,6 +323,12 @@ function createGateway(cfg, deps = {}) {
             for (const e of T.anthropicEventsFromMessage(msg)) res.write(S.formatSSE(e));
             res.end();
           } else sendJSON(res, 200, msg);
+        } else if (route === 'responses') {
+          if (wantStream) {
+            clearInterval(ping);
+            for (const e of RS.eventsFromCompletion(restored, rctx)) res.write(S.formatSSE(e));
+            res.end();
+          } else sendJSON(res, 200, RS.responseFromCompletion(restored, rctx));
         } else if (wantStream) {
           clearInterval(ping);
           for (const c of T.openaiChunksFromCompletion(restored)) res.write(S.formatSSE({ data: c }));
@@ -365,15 +401,18 @@ function createGateway(cfg, deps = {}) {
         return sendJSON(res, 200, { object: 'list', data: [{ id: cfg.model, object: 'model', created: 0, owned_by: 'nearai' }] });
       }
 
-      const routes = { '/v1/messages': 'messages', '/v1/messages/count_tokens': 'count', '/v1/chat/completions': 'chat', '/chat/completions': 'chat', '/_oberig/scrubbed': 'scrubbed' };
+      const routes = {
+        '/v1/messages': 'messages', '/v1/messages/count_tokens': 'count', '/v1/chat/completions': 'chat', '/chat/completions': 'chat',
+        '/v1/responses': 'responses', '/responses': 'responses', '/_oberig/scrubbed': 'scrubbed',
+      };
       const route = routes[p];
-      if (!route) return sendJSON(res, 404, { error: `Oberig serves /v1/messages and /v1/chat/completions only (got ${req.method} ${p}).` });
+      if (!route) return sendJSON(res, 404, { error: `Oberig serves /v1/messages, /v1/responses and /v1/chat/completions only (got ${req.method} ${p}).` });
       if (req.method !== 'POST') return sendJSON(res, 405, { error: 'use POST' });
       const ct = String(req.headers['content-type'] || '');
       if (!/^application\/json\b/i.test(ct)) return sendJSON(res, 415, { error: 'Oberig expects Content-Type: application/json' });
       const raw = await readBody(req);
       let body;
-      try { body = JSON.parse(raw.toString('utf8')); } catch { return sendJSON(res, 400, errorBody(route === 'messages' ? 'messages' : 'chat', 400, 'invalid JSON body')); }
+      try { body = JSON.parse(raw.toString('utf8')); } catch { return sendJSON(res, 400, errorBody(route, 400, 'invalid JSON body')); }
       if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'JSON object expected' });
 
       if (route === 'count') return sendJSON(res, 200, { input_tokens: Math.ceil(raw.length / 4) });
