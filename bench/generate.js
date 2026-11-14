@@ -6,7 +6,7 @@
 // (README, GitHub issue, HTML page, email, JSON tool result). The corpus is
 // deterministic: the same seed always gives the same samples.
 //
-// Payloads are harmless: every domain ends in .invalid and every "secret" is fake.
+// Payloads are harmless: every payload domain ends in .invalid and every "secret" is fake.
 //
 // Phrasings are split in two: "dev" phrasings were used while tuning the shield,
 // "held-out" phrasings (other wordings, and languages the shield has no words for)

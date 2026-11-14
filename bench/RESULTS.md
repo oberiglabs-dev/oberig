@@ -70,10 +70,10 @@ Single thread, `scan()` with every rule and block mode, after a short warm-up.
 
 | | Median | p95 | Max |
 |---|---:|---:|---:|
-| Ordinary documents (724, 23.8 MB) | 0.18 ms | 4.59 ms | 85.4 ms |
-| Injection samples (600) | 0.047 ms | 0.144 ms | |
+| Ordinary documents (724, 23.8 MB) | 0.17 ms | 4.65 ms | 86.0 ms |
+| Injection samples (600) | 0.041 ms | 0.133 ms | |
 
-Throughput on the ordinary documents: 28.3 MB/s. The largest document (1083 KB of raw HTML) took 25.8 ms.
+Throughput on the ordinary documents: 28.5 MB/s. The largest document (1083 KB of raw HTML) took 24.8 ms.
 
 ## What is missed
 

@@ -528,32 +528,33 @@
   // ---- JSON tool results: read the strings through their escapes ----
   var JSON_SIMPLE = { n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', '"': '"', '/': '/' };
   JSON_SIMPLE[ch(92)] = ch(92);
+  // Returns the decoded text and, for every position in it, the position in `src`.
   function jsonView(src) {
-    var out = [];
-    var map = [];
-    for (var i = 0; i < src.length; i++) {
-      var c = src[i];
-      if (c === ch(92) && i + 1 < src.length) {
-        var n = src[i + 1];
-        if (n === 'u' && /^[0-9a-fA-F]{4}$/.test(src.substr(i + 2, 4))) {
-          out.push(String.fromCharCode(parseInt(src.substr(i + 2, 4), 16)));
-          map.push(i);
-          i += 5;
-          continue;
-        }
-        if (JSON_SIMPLE[n] !== undefined) {
-          out.push(JSON_SIMPLE[n]);
-          map.push(i);
-          i += 1;
-          continue;
-        }
-      }
-      // a quote that is not escaped ends or starts a string: read it as a line break
-      out.push(c === '"' ? '\n' : c);
-      map.push(i);
+    var parts = [];
+    var map = new Uint32Array(src.length + 1);
+    var n = 0;
+    var run = 0;
+    function flush(upTo) {
+      if (upTo > run) parts.push(src.slice(run, upTo));
+      for (var k = run; k < upTo; k++) map[n++] = k;
     }
-    map.push(src.length);
-    return { text: out.join(''), map: map };
+    function put(i, s, len) {
+      flush(i);
+      parts.push(s);
+      map[n++] = i;
+      run = i + len;
+    }
+    for (var i = 0; i < src.length; i++) {
+      var c = src.charCodeAt(i);
+      if (c === 34) { put(i, '\n', 1); continue; } // a quote that is not escaped ends or starts a string: read it as a line break
+      if (c !== 92 || i + 1 >= src.length) continue;
+      var e = src[i + 1];
+      if (e === 'u' && /^[0-9a-fA-F]{4}$/.test(src.substr(i + 2, 4))) { put(i, String.fromCharCode(parseInt(src.substr(i + 2, 4), 16)), 6); i += 5; continue; }
+      if (JSON_SIMPLE[e] !== undefined) { put(i, JSON_SIMPLE[e], 2); i += 1; }
+    }
+    flush(src.length);
+    map[n] = src.length;
+    return { text: parts.join(''), map: map };
   }
 
   function scan(text, opts) {
