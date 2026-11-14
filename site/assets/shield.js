@@ -279,7 +279,9 @@
   // ---- links ----
   var MD_IMAGE = /!\[[^\]\n]{0,200}\]\(\s*<?(https?:\/\/[^)\s>]{1,2000})>?(?:\s+"[^"\n]*")?\s*\)/gi;
   var MD_LINK = /(?:^|[^!])\[[^\]\n]{1,200}\]\(\s*<?(https?:\/\/[^)\s>]{1,2000})>?(?:\s+"[^"\n]*")?\s*\)/gi;
-  var MD_DEF = /^[ \t]{0,3}\[[^\]\n]{1,100}\]:[ \t]*<?(https?:\/\/[^\s>]{1,2000})>?/gim;
+  // Agent file tools (Claude Code's Read) print a line number before every line ("     1\t" or "     1→").
+  // The line-anchored rules accept that prefix in group 1 and keep it out of the finding, so block mode leaves it.
+  var MD_DEF = /^((?:[ \t]*\d{1,7}(?:\t|→))?)[ \t]{0,3}\[[^\]\n]{1,100}\]:[ \t]*<?(https?:\/\/[^\s>]{1,2000})>?/gim;
   var HTML_IMG = /<img\b[^>]{0,500}?\bsrc\s*=\s*["'](https?:\/\/[^"']{1,2000})["'][^>]{0,500}>/gi;
   var SAFE_PARAMS = /^(?:style|branch|logo|logocolor|logowidth|color|colora|colorb|label|labelcolor|message|cacheseconds|cache_seconds|link|v|version|sanitize|raw|width|height|w|h|s|u|size|format|auto|fit|q|quality|ixlib|ixid|fm|crop|dpr|theme|t|ref|tab|path|file|lang|locale|utm_[a-z]+|event|workflow|job|query|search|page|page_id|sort|per_page|plastic|flat|url|server|repos?|type|id|user|username|owner|name|title|prefix|suffix|include_prereleases|filter|tag|display_name|display_timestamp|show_icons|hide|hide_border|layout|langs_count|count_private|include_all_commits|bg_color|title_color|text_color|icon_color|border_color|legend|tomlfilepath|registry_uri)$/i;
   var EXFIL_KEYS = /^(?:data|d|c|secret|token|key|password|payload|leak|exfil|env|content|msg|info|x)$/i;
@@ -329,6 +331,12 @@
     while (e < lim2 && !/[.!?\n]/.test(text[e])) e++;
     if (e < text.length && /[.!?]/.test(text[e])) e++;
     while (s < start && /\s/.test(text[s])) s++;
+    // a line number from an agent's file tool ("     3\t") is not part of the sentence
+    var ln = /^\d{1,7}(?:\t|→)/.exec(text.slice(s, start));
+    if (ln && /^[ \t]*$/.test(text.slice(text.lastIndexOf('\n', s - 1) + 1, s))) {
+      s += ln[0].length;
+      while (s < start && /\s/.test(text[s])) s++;
+    }
     return [s, e];
   }
 
@@ -577,10 +585,11 @@
       if (isInstruction(m[1])) add('html-comment', m.index, m.index + m[0].length, plain(m[1]).slice(0, 300));
     }
     // Markdown link reference definitions are never rendered: [//]: # (text), [any label]: <> "text"
-    var mc = /^[ \t]{0,3}\[([^\]\n]{1,100})\]:[ \t]*(?:<[^>\n]*>|\S+)[ \t]*(?:"([^"\n]*)"|'([^'\n]*)'|\(([^)\n]*)\))[ \t]*$/gm;
+    // (an optional line-number prefix from an agent's file tool sits in group 1, outside the finding)
+    var mc = /^((?:[ \t]*\d{1,7}(?:\t|→))?)[ \t]{0,3}\[([^\]\n]{1,100})\]:[ \t]*(?:<[^>\n]*>|\S+)[ \t]*(?:"([^"\n]*)"|'([^'\n]*)'|\(([^)\n]*)\))[ \t]*$/gm;
     while ((m = mc.exec(src)) !== null) {
-      var body = m[2] || m[3] || m[4] || '';
-      if (isInstruction(body)) add('md-comment', m.index, m.index + m[0].length, plain(body).slice(0, 300));
+      var body = m[3] || m[4] || m[5] || '';
+      if (isInstruction(body)) add('md-comment', m.index + m[1].length, m.index + m[0].length, plain(body).slice(0, 300));
     }
     if (/<[a-zA-Z]/.test(src)) cssHidden(src, add);
     hiddenAttrs(src, add);
@@ -628,7 +637,7 @@
       HTML_IMG.lastIndex = 0;
       while ((m = HTML_IMG.exec(src)) !== null) if (suspiciousUrl(m[1], false)) add('exfil-link', m.index, m.index + m[0].length, null, CUT_LINK);
       MD_DEF.lastIndex = 0;
-      while ((m = MD_DEF.exec(src)) !== null) if (suspiciousUrl(m[1], true)) add('exfil-link', m.index, m.index + m[0].length, null, CUT_LINK);
+      while ((m = MD_DEF.exec(src)) !== null) if (suspiciousUrl(m[2], true)) add('exfil-link', m.index + m[1].length, m.index + m[0].length, null, CUT_LINK);
       MD_LINK.lastIndex = 0;
       while ((m = MD_LINK.exec(src)) !== null) {
         var off = m[0].charAt(0) === '[' ? 0 : 1;
