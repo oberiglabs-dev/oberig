@@ -12,7 +12,7 @@ const BIN = path.join(__dirname, '..', 'bin', 'oberig.js');
 const run = (args, env = {}) => spawnSync(process.execPath, [BIN, ...args], { encoding: 'utf8', env: { ...process.env, NO_COLOR: '1', OBERIG_PORT: '1', ...env }, timeout: 20000 });
 
 test('--version and --help', () => {
-  assert.equal(run(['--version']).stdout.trim(), 'oberig 0.1.0');
+  assert.equal(run(['--version']).stdout.trim(), 'oberig 0.2.0');
   const h = run(['--help']);
   assert.equal(h.status, 0);
   for (const cmd of ['start', 'verify', 'shield', 'scrub', 'setup', 'anchor']) assert.ok(h.stdout.includes(`oberig ${cmd}`), cmd);

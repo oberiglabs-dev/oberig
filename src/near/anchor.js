@@ -81,7 +81,9 @@ function receiptHashes(items) {
  * "oberig anchor --out", a proof file, JSON Lines, or one hash per line.
  */
 function loadFile(file) {
-  const text = fs.readFileSync(file, 'utf8').replace(/^﻿/, '');
+  // Windows PowerShell 5.1 writes '>' redirects as UTF-16LE with a byte order mark.
+  const buf = fs.readFileSync(file);
+  const text = (buf[0] === 0xff && buf[1] === 0xfe ? buf.toString('utf16le') : buf.toString('utf8')).replace(/^\uFEFF/, '');
   let j;
   try { j = JSON.parse(text); } catch { j = undefined; }
   if (j !== undefined) {

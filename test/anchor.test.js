@@ -35,7 +35,7 @@ test('the record is one root under <account>/oberig/anchors with SocialDB-safe k
   assert.equal(rec.root, M.root(hs).toString('hex'));
   assert.equal(rec.key, `${ACCOUNT}/oberig/anchors/${rec.root}`);
   for (const k of rec.key.split('/').slice(1)) assert.match(k, /^[a-zA-Z0-9_.-]{1,256}$/);
-  assert.deepEqual(JSON.parse(rec.value), { v: 1, tree: 'rfc6962-sha256', n: 3, t: '2026-11-14T03:21:07Z', app: 'oberig/0.1.0' });
+  assert.deepEqual(JSON.parse(rec.value), { v: 1, tree: 'rfc6962-sha256', n: 3, t: '2026-11-14T03:21:07Z', app: 'oberig/0.2.0' });
   assert.equal(rec.args.data[ACCOUNT].oberig.anchors[rec.root], rec.value);
   assert.deepEqual(rec.args.options, { refund_unused_deposit: true });
   assert.throws(() => A.buildRecord('Bad Account', hs), /not a valid NEAR account/);
@@ -86,6 +86,9 @@ test('loadFile reads receipts, gateway state, JSON Lines, anchor files and proof
     assert.deepEqual(A.loadFile(w('h.txt', `${r[0].hash}\r\n${r[1].hash}\n`)).items, [r[0].hash, r[1].hash]);
     assert.equal(A.loadFile(w('anchor.json', JSON.stringify({ oberig: 'anchor', leaves: [r[0].hash] }))).kind, 'anchor');
     assert.equal(A.loadFile(w('proof.json', JSON.stringify({ oberig: 'proof' }))).kind, 'proof');
+    const utf16 = path.join(dir, 'ps.json');
+    fs.writeFileSync(utf16, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(JSON.stringify(r[0], null, 2) + '\r\n', 'utf16le')]));
+    assert.equal(A.loadFile(utf16).items[0].hash, r[0].hash, 'a PowerShell 5.1 redirect (UTF-16LE) is read');
     assert.throws(() => A.loadFile(w('x.json', '{"nothing":1}')), /no receipts found/);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

@@ -1,7 +1,7 @@
 'use strict';
 // Oberig settings. Everything comes from the environment; nothing is read from or written to disk.
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 
 const NEAR_URL = 'https://cloud-api.near.ai/v1';
 const DEFAULT_MODEL = 'deepseek-ai/DeepSeek-V4.1-Flash-1017';

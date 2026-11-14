@@ -12,7 +12,7 @@ test('startup banner matches the published format', () => {
   const lines = ui.banner({ cfg, attestation: { ok: true, signer: '3f2a' + '0'.repeat(56) + '9c1b' } }, false).split('\n');
   assert.deepEqual(lines, [
     '  ×   ×',
-    '×   ×   ×   OBERIG v0.1.0',
+    '×   ×   ×   OBERIG v0.2.0',
     "  ×   ×     your agent's amulet",
     'Enclave    NEAR AI · deepseek-ai/DeepSeek-V4.1-Flash-1017',
     'Verified   ✓ enclave attested · signer 0x3f2a…9c1b',

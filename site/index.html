@@ -135,7 +135,7 @@
         <p class="kicker rv">Shield</p>
         <h2 id="shield-h" class="title" data-stitch="hidden instructions stop here."><span class="stitch-text">Hidden instructions stop here.</span></h2>
         <div class="shield-cols">
-          <p class="rv" style="--i:1">Web pages, READMEs, issues and emails can carry text your agent reads and you never see. Oberig scans tool results and pasted context before the model gets them, and cuts the hidden parts out.</p>
+          <p class="rv" style="--i:1">Web pages, READMEs, issues and emails can carry text your agent reads and you never see. Oberig scans tool results and pasted context before the model gets them, and cuts the hidden parts out. In its benchmark it caught 92.8% of 600 hidden injections in 22 languages, and flagged 1.4% of 222 real documents it was not tuned on.</p>
           <div class="rv" style="--i:2">
             <ul class="catch" aria-label="What the shield looks for">
               <li>HTML and markdown comments</li>
@@ -182,7 +182,7 @@
             </div>
           </div>
           <h3 class="rv">Check every answer.</h3>
-          <p class="rv" style="--i:1">Each request gets a receipt: attestation and signature status, masked counts, shield findings, and SHA-256 hashes of what went out and came back. Metadata only, kept in memory. The receipt hash stitches a seal, and the same receipt always gives the same seal.</p>
+          <p class="rv" style="--i:1">Each request gets a receipt: attestation and signature status, masked counts, shield findings, and SHA-256 hashes of what went out and came back. Metadata only, kept in memory. The receipt hash stitches a seal, and the same receipt always gives the same seal. <code>oberig anchor</code> can put a session's receipts on NEAR as one Merkle root that anyone can check later.</p>
         </article>
         <article class="card">
           <div class="stage stage-band">
@@ -259,7 +259,7 @@
             <summary>What does it verify?</summary>
             <div class="faq-a">
               <p>Before the first request, and again every 10 minutes, it fetches a fresh attestation report with its own nonce. It checks that the TDX quote is signed by an Intel-rooted key, that the nonce and the signing key are bound into it, and replays the enclave's event log, then pins that signer. After the answer it checks the response signature against SHA-256 hashes of the exact bytes sent and received.</p>
-              <p>The NVIDIA GPU verdict needs NVIDIA's service, so it runs only with <code>OBERIG_VERIFY=full</code>. Intel's TCB status is not checked yet. Every receipt marks what was not checked.</p>
+              <p>With <code>OBERIG_VERIFY=full</code> Oberig also checks Intel's TCB status, QE identity and revocation lists from Intel PCS, and the NVIDIA GPU verdict from NRAS with its token signatures, all on your computer. An out-of-date TCB shows as a warning unless <code>OBERIG_REQUIRE_TCB=uptodate</code>. Every receipt marks what was not checked.</p>
             </div>
           </details>
           <details name="faq">
