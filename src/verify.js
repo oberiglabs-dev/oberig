@@ -6,15 +6,21 @@
 // checks it locally. After each answer it fetches the answer's signature and
 // checks it against the exact bytes it sent and received.
 //
-// Every check reports 'ok', 'fail' or 'skip' (not checked). Nothing is claimed
-// that is not checked here.
+// By default every check is local: nothing but NEAR AI is contacted. With
+// OBERIG_VERIFY=full Oberig also fetches Intel's PCS collateral for each quote
+// (pcs.js) and asks NVIDIA NRAS for the GPU verdict (nras.js), and checks both
+// answers itself.
+//
+// Every check reports 'ok', 'fail', 'warn' (shown, not refused: a TCB status
+// other than UpToDate) or 'skip' (not checked). Nothing is claimed that is not
+// checked here.
 
 const crypto = require('node:crypto');
 const { parseQuote, verifyQuoteChain, hexBuf, b64url } = require('./quote.js');
 const { recoverEip191 } = require('./ecdsa.js');
 const { VERSION } = require('./config.js');
-
-const NRAS_URL = 'https://nras.attestation.nvidia.com/v3/attest/gpu';
+const PCS = require('./pcs.js');
+const NRAS = require('./nras.js');
 
 const sha = (alg, ...parts) => { const h = crypto.createHash(alg); for (const p of parts) h.update(p); return h.digest(); };
 const parseMaybe = (v) => (typeof v === 'string' ? JSON.parse(v) : v);
@@ -105,12 +111,17 @@ function checkOne(rep, nonce, opts = {}) {
   return { ok, signer, algo, checks };
 }
 
+/** The model attestations Oberig checks: every candidate returned for this model. */
+function candidates(body, model) {
+  const list = body && Array.isArray(body.model_attestations) ? body.model_attestations : [];
+  return list.filter((m) => !model || !m.model_name || m.model_name === model);
+}
+
 /** Checks a full /v1/attestation/report body for one model. Pure (no network). */
 function checkAttestation(body, nonce, opts = {}) {
   const model = opts.model;
   const out = { ok: false, model, nonce, modelSigners: [], gateway: null, models: [], checks: [], error: null };
-  const list = body && Array.isArray(body.model_attestations) ? body.model_attestations : [];
-  const named = list.filter((m) => !model || !m.model_name || m.model_name === model);
+  const named = candidates(body, model);
   if (!named.length) {
     out.error = 'no model attestation returned for ' + model;
     out.checks.push({ id: 'report', label: 'attestation report for this model', status: 'fail', detail: out.error });
@@ -132,8 +143,8 @@ function checkAttestation(body, nonce, opts = {}) {
     detail: out.gateway ? (out.gateway.ok ? `${out.gateway.checks.length} checks` : (out.gateway.checks.find((c) => c.status === 'fail') || {}).label) : 'no gateway evidence',
   });
   if (out.modelSigners.length !== 1) out.checks.push({ id: 'one-signer', label: 'one model signing key', status: 'fail', detail: `${out.modelSigners.length} keys` });
-  out.checks.push({ id: 'tcb', label: 'Intel TCB status', status: 'skip', detail: 'not checked locally' });
-  out.checks.push({ id: 'gpu-verdict', label: 'GPU verdict (NVIDIA)', status: 'skip', detail: 'not checked locally' });
+  out.checks.push({ id: 'tcb', label: 'Intel TCB status, QE identity, CRLs', status: 'skip', detail: 'not checked locally (OBERIG_VERIFY=full checks them)' });
+  out.checks.push({ id: 'gpu-verdict', label: 'GPU verdict (NVIDIA NRAS)', status: 'skip', detail: 'not checked locally (OBERIG_VERIFY=full checks it)' });
   out.ok = out.checks.every((c) => c.status !== 'fail');
   out.signer = out.modelSigners[0] || null;
   out.gatewaySigner = out.gateway ? normAddr(out.gateway.signer) : null;
@@ -144,37 +155,74 @@ function checkAttestation(body, nonce, opts = {}) {
   return out;
 }
 
-function decodeJwtPayload(token) {
-  const part = String(token || '').split('.')[1];
-  if (!part) throw new Error('not a JWT');
-  return JSON.parse(Buffer.from(part.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
+const RANK = ['fail', 'warn', 'ok', 'skip'];
+
+/** One row per check id across candidates: the worst status wins and keeps its label and detail. */
+function mergeRows(lists) {
+  return lists[0].map((c) => {
+    const all = lists.map((l) => l.find((x) => x.id === c.id) || { ...c, status: 'fail', detail: 'not checked for every candidate' });
+    return all.reduce((a, b) => (RANK.indexOf(b.status) < RANK.indexOf(a.status) ? b : a));
+  });
 }
 
-/** OBERIG_VERIFY=full: asks NVIDIA NRAS for the GPU verdict. Returns a check object. */
-async function nrasCheck(rep, nonce, fetchImpl) {
-  const label = 'GPU verdict (NVIDIA NRAS)';
+/** Intel collateral for one quote; a quote whose chain does not verify gets failed rows. */
+function collateralFor(rep, opts, deps) {
   try {
-    const payload = parseMaybe(rep.nvidia_payload);
-    const res = await fetchImpl(NRAS_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json', 'user-agent': `oberig/${VERSION}` },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(20000),
-    });
-    if (!res.ok) return { id: 'gpu-verdict', label, status: 'fail', detail: `NRAS returned ${res.status}` };
-    const j = await res.json();
-    const first = Array.isArray(j) ? j[0] : null;
-    const token = Array.isArray(first) && first[0] === 'JWT' ? first[1] : null;
-    const claims = decodeJwtPayload(token);
-    const pass = claims['x-nvidia-overall-att-result'] === true;
-    const nonceOk = !claims.eat_nonce || normAddr(claims.eat_nonce) === normAddr(nonce);
-    return {
-      id: 'gpu-verdict', label, status: pass && nonceOk ? 'ok' : 'fail',
-      detail: pass ? (nonceOk ? 'overall result true (token signature not checked)' : 'nonce mismatch in token') : 'overall result false',
-    };
+    const q = parseQuote(rep.intel_quote);
+    const chain = verifyQuoteChain(q, opts);
+    if (!chain.ok) return Promise.resolve(PCS.failedCollateral(`quote chain did not verify (${chain.error})`));
+    return PCS.checkCollateral(q, chain.pems, opts, deps);
   } catch (err) {
-    return { id: 'gpu-verdict', label, status: 'fail', detail: err.message };
+    return Promise.resolve(PCS.failedCollateral(err.message));
   }
+}
+
+/**
+ * OBERIG_VERIFY=full: Intel PCS collateral for every model candidate and the
+ * gateway, and the NRAS GPU verdict for every candidate. Replaces the two
+ * 'not checked locally' rows of `out` with the results and recomputes out.ok.
+ * deps: {fetch, now, rootFingerprint, cache}.
+ */
+async function fullChecks(out, body, nonce, cfg, deps = {}) {
+  const opts = { now: deps.now, rootFingerprint: deps.rootFingerprint, requireTcb: cfg.requireTcb };
+  const net = { fetch: deps.fetch, cache: deps.cache };
+  const reps = candidates(body, cfg.model);
+  const [models, gateway, gpus] = await Promise.all([
+    Promise.all(reps.map((rep) => collateralFor(rep, opts, net))),
+    body.gateway_attestation ? collateralFor(body.gateway_attestation, opts, net) : null,
+    Promise.all(reps.map((rep) => NRAS.nrasAttest(rep, nonce, opts, net))),
+  ]);
+
+  const intelRows = mergeRows(models.map((m) => m.checks));
+  const gwRows = [];
+  if (gateway && out.gateway) {
+    out.gateway.checks.push(...gateway.checks.filter((c) => c.id !== 'tcb'));
+    out.gateway.ok = out.gateway.checks.every((c) => c.status !== 'fail');
+    const row = out.checks.find((c) => c.id === 'gateway');
+    row.status = out.gateway.ok ? 'ok' : 'fail';
+    row.detail = out.gateway.ok ? `${out.gateway.checks.length} checks` : (out.gateway.checks.find((c) => c.status === 'fail') || {}).label;
+    const t = gateway.checks.find((c) => c.id === 'tcb');
+    gwRows.push({ ...t, id: 'gateway-tcb', label: `gateway ${t.label}` });
+  }
+  const gpuRows = mergeRows(gpus.map((g) => g.checks)).map((c) => ({ ...c }));
+  const total = gpus.reduce((n, g) => n + g.gpus, 0);
+  const passed = gpus.reduce((n, g) => n + g.passed, 0);
+  const tokens = gpuRows.find((c) => c.id === 'gpu-tokens');
+  const verdict = gpuRows.find((c) => c.id === 'gpu-verdict');
+  if (tokens.status === 'ok') tokens.detail = `${gpus.length} overall + ${total} GPU tokens`;
+  if (verdict.status === 'ok') verdict.detail = `overall result true · ${passed}/${total} GPUs pass${gpus.length > 1 ? ` (${gpus.length} candidates)` : ''}`;
+
+  out.checks.splice(out.checks.findIndex((c) => c.id === 'tcb'), 1, ...intelRows, ...gwRows);
+  out.checks.splice(out.checks.findIndex((c) => c.id === 'gpu-verdict'), 1, ...gpuRows);
+  const tcbRow = intelRows.find((c) => c.id === 'tcb');
+  const worst = models.find((m) => m.checks.includes(tcbRow));
+  out.tcb = { model: worst ? worst.tcbStatus : null, gateway: gateway ? gateway.tcbStatus : null };
+  out.ok = out.checks.every((c) => c.status !== 'fail');
+  if (!out.ok && !out.error) {
+    const f = out.checks.find((c) => c.status === 'fail');
+    out.error = `${f.label}: ${f.detail || 'failed'}`;
+  }
+  return out;
 }
 
 function reportUrl(cfg, nonce) {
@@ -204,11 +252,7 @@ async function attest(cfg, deps = {}) {
     const body = await res.json();
     const out = checkAttestation(body, nonce, { model: cfg.model, algo: cfg.signingAlgo, now: deps.now, rootFingerprint: deps.rootFingerprint });
     if (cfg.verifyMode === 'full' && out.models.length) {
-      const gpu = await nrasCheck(body.model_attestations.find((m) => !cfg.model || m.model_name === cfg.model) || body.model_attestations[0], nonce, fetchImpl);
-      const i = out.checks.findIndex((c) => c.id === 'gpu-verdict');
-      out.checks[i] = gpu;
-      out.ok = out.checks.every((c) => c.status !== 'fail');
-      if (!out.ok && !out.error) out.error = `${gpu.label}: ${gpu.detail}`;
+      await fullChecks(out, body, nonce, cfg, { fetch: fetchImpl, now: deps.now, rootFingerprint: deps.rootFingerprint, cache: deps.cache });
     }
     out.fetchedAt = started;
     out.ms = Date.now() - started;
@@ -299,6 +343,6 @@ async function fetchSignature(cfg, id, deps = {}) {
 }
 
 module.exports = {
-  checkOne, checkAttestation, checkSignature, attest, fetchSignature, nrasCheck,
+  checkOne, checkAttestation, checkSignature, attest, fetchSignature, fullChecks,
   verifyEd25519, verifyEcdsa, replayRtmr3, shortSigner, normAddr, randomNonce, reportUrl,
 };

@@ -36,6 +36,7 @@ function loadConfig(overrides = {}, env = process.env) {
     keyVar,
     requireAttestation: flag(env.OBERIG_REQUIRE_ATTESTATION, true),
     verifyMode: oneOf('OBERIG_VERIFY', env.OBERIG_VERIFY, ['local', 'full'], 'local'),
+    requireTcb: oneOf('OBERIG_REQUIRE_TCB', env.OBERIG_REQUIRE_TCB, ['warn', 'uptodate'], 'warn'),
     signingAlgo: oneOf('OBERIG_SIGNING_ALGO', env.OBERIG_SIGNING_ALGO, ['ed25519', 'ecdsa'], 'ed25519'),
     attestTtlMs: Math.max(60, Number(env.OBERIG_ATTEST_TTL || 600)) * 1000,
     shield: oneOf('OBERIG_SHIELD', env.OBERIG_SHIELD, ['block', 'warn', 'off'], 'block'),
