@@ -183,7 +183,7 @@ The answer reaches your agent first; the signature check follows and lands in th
 - All instances of a model share one signing key. A signer match shows the attested key signed the answer, not which machine answered.
 - Preflight evidence plus one response signature is not yet a complete model-to-gateway-to-answer chain.
 - By default Oberig asks NEAR AI non-streaming, with the canonical model ID and `x-no-aliasing: true`, to get a model-level (`provider_tee`) signature, then streams to your agent locally. With `OBERIG_UPSTREAM_STREAM=1` it streams from NEAR AI and expects a gateway signature over the exact stream bytes. Which kind a given answer carries is shown in its receipt.
-- A live chat signature was not yet tested against the production API while this version was written (no key was at hand); everything above runs against captured live attestation reports and a mocked API in the tests.
+- Tested live on 14 Nov 2026 against NEAR AI Cloud (DeepSeek V4.1 Flash 1017): `oberig verify --chat` passed every local attestation check and verified the test answer's signature with the model's TEE key, and a Claude Code style request through the gateway came back with 2 values masked, the signature verified and a seal.
 
 `oberig verify` prints the receipt:
 
