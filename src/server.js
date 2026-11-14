@@ -14,6 +14,36 @@ const T = require('./translate.js');
 const S = require('./streams.js');
 const V = require('./verify.js');
 const R = require('./receipt.js');
+const Merkle = require('./near/merkle.js');
+const bs58 = require('./near/base58.js');
+const { NETWORKS, explorerTx } = require('./near/rpc.js');
+const { isAccountId } = require('./near/tx.js');
+
+const HEX64 = /^[0-9a-f]{64}$/;
+const MAX_ANCHORS = 50;
+const MAX_LEAVES = 5000;
+
+/**
+ * Checks an anchor reported by "oberig anchor --send" before the dashboard shows it:
+ * the leaves must hash to the root, and every field must have the expected shape.
+ * The explorer link is built here, never taken from the request.
+ */
+function validAnchor(b) {
+  if (!b || typeof b !== 'object') return 'JSON object expected';
+  const net = NETWORKS[b.network];
+  if (!net) return 'network must be mainnet or testnet';
+  if (b.contract !== net.social) return `contract must be ${net.social}`;
+  if (!isAccountId(b.account)) return 'account is not a NEAR account id';
+  if (typeof b.root !== 'string' || !HEX64.test(b.root)) return 'root must be 64 hex characters';
+  if (!Array.isArray(b.leaves) || !b.leaves.length || b.leaves.length > MAX_LEAVES || !b.leaves.every((h) => typeof h === 'string' && HEX64.test(h))) return 'leaves must be receipt hashes';
+  if (new Set(b.leaves).size !== b.leaves.length) return 'leaves must be unique';
+  let tx = null;
+  try { tx = typeof b.tx === 'string' && b.tx.length <= 64 ? bs58.decode(b.tx) : null; } catch { tx = null; }
+  if (!tx || tx.length !== 32) return 'tx must be a NEAR transaction hash';
+  if (b.block != null && !(Number.isInteger(b.block) && b.block > 0)) return 'block must be a block height';
+  if (Merkle.root(b.leaves).toString('hex') !== b.root) return 'the leaves do not give this root';
+  return null;
+}
 
 const FILES = {
   '/': [path.join(__dirname, '..', 'dashboard', 'index.html'), 'text/html; charset=utf-8'],
@@ -110,8 +140,32 @@ function createGateway(cfg, deps = {}) {
   events.setMaxListeners(50);
   const stoppedSeen = new Set();
   const startedAt = Date.now();
+  const anchors = []; // roots published with "oberig anchor --send" during this session, oldest first
   let att = null;
   let attPromise = null;
+
+  /** Anchor as the dashboard sees it: only the leaves that are receipts of this session. */
+  function publicAnchor(a) {
+    const known = new Set(book.items.map((r) => r.hash));
+    return {
+      root: a.root, network: a.network, account: a.account, contract: a.contract, tx: a.tx, explorer: a.explorer,
+      block: a.block, time: a.time, count: a.leaves.length, hashes: a.leaves.filter((h) => known.has(h)),
+    };
+  }
+
+  function addAnchor(b) {
+    const a = {
+      root: b.root, network: b.network, account: b.account, contract: b.contract, tx: b.tx,
+      explorer: explorerTx(NETWORKS[b.network], b.tx), block: b.block == null ? null : b.block, time: Date.now(), leaves: b.leaves.slice(),
+    };
+    const i = anchors.findIndex((x) => x.root === a.root && x.network === a.network && x.account === a.account);
+    if (i !== -1) anchors.splice(i, 1);
+    anchors.push(a);
+    if (anchors.length > MAX_ANCHORS) anchors.shift();
+    const pub = publicAnchor(a);
+    events.emit('anchored', pub);
+    return pub;
+  }
 
   function publicAtt(a) {
     if (!a) return null;
@@ -146,6 +200,7 @@ function createGateway(cfg, deps = {}) {
       version: VERSION, model: cfg.model, startedAt,
       guards: { mask: cfg.mask, shield: cfg.shield, seals: true, requireAttestation: cfg.requireAttestation, verify: cfg.verifyMode },
       attestation: publicAtt(att), counters: counters(), receipts: book.items.slice(0, 80),
+      anchors: anchors.map(publicAnchor),
     };
   }
 
@@ -333,11 +388,13 @@ function createGateway(cfg, deps = {}) {
     const onReceipt = (r) => res.write(S.formatSSE({ event: 'receipt', data: { receipt: r, counters: counters() } }));
     const onAtt = (a) => res.write(S.formatSSE({ event: 'attestation', data: a }));
     const onScrub = () => res.write(S.formatSSE({ event: 'counters', data: counters() }));
+    const onAnchor = (a) => res.write(S.formatSSE({ event: 'anchored', data: a }));
     events.on('receipt', onReceipt);
     events.on('attestation', onAtt);
     events.on('scrub', onScrub);
+    events.on('anchored', onAnchor);
     const keep = setInterval(() => res.write(': ping\n\n'), 15000);
-    req.on('close', () => { events.off('receipt', onReceipt); events.off('attestation', onAtt); events.off('scrub', onScrub); clearInterval(keep); });
+    req.on('close', () => { events.off('receipt', onReceipt); events.off('attestation', onAtt); events.off('scrub', onScrub); events.off('anchored', onAnchor); clearInterval(keep); });
   }
 
   const server = http.createServer(async (req, res) => {
@@ -358,6 +415,13 @@ function createGateway(cfg, deps = {}) {
       if (req.method === 'GET' && FILES[p]) return serveFile(res, p);
       if (req.method === 'GET' && p === '/_oberig/state') return sendJSON(res, 200, snapshot());
       if (req.method === 'GET' && p === '/_oberig/events') return serveEvents(req, res);
+      if (req.method === 'GET' && p === '/_oberig/receipts') {
+        // For "oberig anchor": every receipt hash of the session, oldest first, and the anchors so far.
+        return sendJSON(res, 200, {
+          receipts: book.items.slice().reverse().map((r) => ({ hash: r.hash, id: r.id, time: r.time, verdict: r.verdict })),
+          anchors: anchors.map((a) => ({ ...publicAnchor(a), leaves: a.leaves })),
+        });
+      }
       if (req.method === 'GET' && (p === '/v1/models' || p === '/models')) {
         if (req.headers['anthropic-version']) {
           return sendJSON(res, 200, { data: [{ type: 'model', id: cfg.model, display_name: `${cfg.model} (NEAR AI, via Oberig)`, created_at: '2026-10-17T00:00:00Z' }], has_more: false, first_id: cfg.model, last_id: cfg.model });
@@ -365,7 +429,7 @@ function createGateway(cfg, deps = {}) {
         return sendJSON(res, 200, { object: 'list', data: [{ id: cfg.model, object: 'model', created: 0, owned_by: 'nearai' }] });
       }
 
-      const routes = { '/v1/messages': 'messages', '/v1/messages/count_tokens': 'count', '/v1/chat/completions': 'chat', '/chat/completions': 'chat', '/_oberig/scrubbed': 'scrubbed' };
+      const routes = { '/v1/messages': 'messages', '/v1/messages/count_tokens': 'count', '/v1/chat/completions': 'chat', '/chat/completions': 'chat', '/_oberig/scrubbed': 'scrubbed', '/_oberig/anchored': 'anchored' };
       const route = routes[p];
       if (!route) return sendJSON(res, 404, { error: `Oberig serves /v1/messages and /v1/chat/completions only (got ${req.method} ${p}).` });
       if (req.method !== 'POST') return sendJSON(res, 405, { error: 'use POST' });
@@ -384,6 +448,12 @@ function createGateway(cfg, deps = {}) {
         events.emit('scrub');
         return sendJSON(res, 200, { ok: true });
       }
+      if (route === 'anchored') {
+        const problem = validAnchor(body);
+        if (problem) return sendJSON(res, 400, { error: `anchor refused: ${problem}` });
+        const a = addAnchor(body);
+        return sendJSON(res, 200, { ok: true, marked: a.hashes.length });
+      }
       return await handleModel(route, req, res, body, controller.signal);
     } catch (err) {
       if (controller.signal.aborted) return;
@@ -396,6 +466,7 @@ function createGateway(cfg, deps = {}) {
   return {
     server, cfg, vault, book, events, snapshot, ensureAttestation,
     get attestation() { return att; },
+    get anchors() { return anchors.map(publicAnchor); },
     listen() {
       return new Promise((resolve, reject) => {
         server.once('error', reject);
@@ -406,4 +477,4 @@ function createGateway(cfg, deps = {}) {
   };
 }
 
-module.exports = { createGateway, shieldBody, detectClient, errorBody };
+module.exports = { createGateway, shieldBody, detectClient, errorBody, validAnchor };

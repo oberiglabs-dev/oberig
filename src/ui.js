@@ -70,6 +70,14 @@ function logLine(r, color = false) {
   return `${hhmmss(r.time)}  ${r.client} → near ${mark} ${word}  ${k.red('◆')} masked ${(r.masked && r.masked.total) || 0}  ${k.red('⚑')} ${r.shield && r.shield.mode === 'warn' ? 'flagged' : 'stopped'} ${(r.shield && r.shield.stopped) || 0}  ${r.status}  ${secs}  seal ${r.id}`;
 }
 
+/** Logged when "oberig anchor --send" reports a root the gateway checked. */
+function anchorLine(a, color = false) {
+  const k = colors(color);
+  const net = a.network === 'testnet' ? 'NEAR testnet' : 'NEAR mainnet';
+  const n = a.hashes ? a.hashes.length : a.count;
+  return `${hhmmss(a.time || Date.now())}  ${k.gold('◈')} anchored ${n} receipt${n === 1 ? '' : 's'} on ${net} · ${a.account} · root ${a.root.slice(0, 4)}…${a.root.slice(-4)} · tx ${a.tx.slice(0, 6)}…`;
+}
+
 /** The `oberig verify` receipt. */
 function enclaveReceipt(rec, opts = {}) {
   const k = colors(!!opts.color);
@@ -109,4 +117,4 @@ function enclaveReceipt(rec, opts = {}) {
   return out.join('\n');
 }
 
-module.exports = { banner, logLine, enclaveReceipt, useColor, colors, hhmmss };
+module.exports = { banner, logLine, anchorLine, enclaveReceipt, useColor, colors, hhmmss };

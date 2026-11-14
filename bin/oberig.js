@@ -29,6 +29,14 @@ Usage
   oberig scrub <path> [--out <path>]
                              write sanitised copies of agent traces
   oberig setup               how to connect Claude Code, Codex and OpenCode
+  oberig anchor [--send]     put the Merkle root of this session's receipt hashes on
+                             NEAR (SocialDB, under your account). Without --send it is
+                             a dry run that only reads from the chain.
+        [--receipts <file>]  anchor receipts from a file instead of the gateway
+        [--out <file>]       save the root and all leaves, to prove any receipt later
+        [--network mainnet|testnet] [--account <id>]
+  oberig anchor --check <receipt-hash|root> [--receipts <file> | --proof <file>]
+                             check an anchor with a free view call (--out writes a proof)
   oberig --version | --help
 
 Environment
@@ -38,6 +46,9 @@ Environment
   OBERIG_SHIELD              block | warn | off (default block)
   OBERIG_REQUIRE_ATTESTATION 1 | 0 (default 1: nothing is sent unless the check passes)
   OBERIG_VERIFY              local | full (full adds the NVIDIA GPU verdict)
+  NEAR_ACCOUNT_ID            your NEAR account for oberig anchor (for example name.near)
+  NEAR_PRIVATE_KEY           its key, ed25519:... (only for --send; never read from files)
+  NEAR_RPC_URL               optional NEAR RPC address
   More in the README.
 `;
 
@@ -48,7 +59,7 @@ function parseArgs(argv) {
     if (a.startsWith('--')) {
       const eq = a.indexOf('=');
       if (eq !== -1) out[a.slice(2, eq)] = a.slice(eq + 1);
-      else if (['port', 'out'].includes(a.slice(2)) && argv[i + 1] && !argv[i + 1].startsWith('--')) out[a.slice(2)] = argv[++i];
+      else if (['port', 'out', 'receipts', 'proof', 'network', 'account', 'check'].includes(a.slice(2)) && argv[i + 1] && !argv[i + 1].startsWith('--')) out[a.slice(2)] = argv[++i];
       else out[a.slice(2)] = true;
     } else if (a === '-h') out.help = true;
     else if (a === '-v') out.version = true;
@@ -66,6 +77,7 @@ async function cmdStart(args) {
   const cfg = loadConfig(args.port ? { port: Number(args.port) } : {});
   const color = ui.useColor();
   const gw = createGateway(cfg, { log: (rec) => { if (!cfg.quiet) process.stdout.write(ui.logLine(rec, color) + '\n'); } });
+  gw.events.on('anchored', (a) => { if (!cfg.quiet) process.stdout.write(ui.anchorLine(a, color) + '\n'); });
   try {
     await gw.listen();
   } catch (err) {
@@ -225,6 +237,252 @@ function cmdSetup() {
 `);
 }
 
+// ---- oberig anchor ----
+
+function anchorDeps() {
+  return { A: require('../src/near/anchor.js'), N: require('../src/near/rpc.js'), T: require('../src/near/tx.js'), M: require('../src/near/merkle.js') };
+}
+
+function hostOf(url) { try { return new URL(url).host; } catch { return url; } }
+
+function writeJson(file, obj) {
+  fs.writeFileSync(file, JSON.stringify(obj, null, 2) + '\n');
+}
+
+function planLines(p, { net, source, k, A }) {
+  const c = p.cost;
+  const row = (key, val) => `  ${key.padEnd(10)}${val}`;
+  const out = [];
+  out.push(row('receipts', `${p.count} from ${source}`));
+  out.push(row('root', p.root));
+  out.push(row('', k.dim('RFC 6962 Merkle tree (SHA-256) of the receipt hashes, oldest first')));
+  out.push(row('network', `${net.name} · RPC ${hostOf(net.rpc[0])}`));
+  out.push(row('contract', `${p.contract} · set (SocialDB)`));
+  out.push(row('record', p.key));
+  out.push(row('value', p.value));
+  out.push('');
+  out.push(row('account', p.account ? `${p.accountId} · ${A.near(p.balance)} NEAR` : `${p.accountId} · not found on ${net.name}`));
+  let signer = 'NEAR_PRIVATE_KEY not set (only --send needs it)';
+  if (p.signer) {
+    const ak = p.accessKey;
+    const perm = !ak ? 'not a key of this account' : ak.permission === 'FullAccess' ? 'full access' : 'function-call key';
+    signer = `${p.signer} · ${perm}`;
+  }
+  out.push(row('signer', signer));
+  out.push(row('socialdb', p.registered
+    ? `registered · ${p.storage.available_bytes} prepaid bytes free`
+    : 'not registered yet: the first write registers the account (0.02 NEAR minimum deposit)'));
+  out.push('');
+  out.push(row('cost', `storage  about ${A.near(c.keep)} NEAR stays in SocialDB for this record (about ${c.bytes} bytes)`));
+  out.push(row('', c.deposit > 0n
+    ? `deposit  ${A.near(c.deposit)} NEAR attached; the part the record does not use comes back in the same transaction`
+    : 'deposit  none: the prepaid SocialDB storage covers it'));
+  out.push(row('', `gas      about ${A.near(c.gasUsed)} NEAR used; ${A.near(c.gasHeld, 3)} NEAR is reserved while it runs, the rest comes back (${Number(c.gas / 1000000000000n)} TGas)`));
+  out.push(row('', `needs    about ${A.near(c.needed, 3)} NEAR available in ${p.accountId}`));
+  if (p.problems.length) {
+    out.push('');
+    for (const pr of p.problems) out.push(`  ${k.red('✗')} ${pr}`);
+  }
+  return out;
+}
+
+async function cmdAnchorCheck(args, ctx) {
+  const { A, N, M } = anchorDeps();
+  const k = ui.colors(ui.useColor());
+  const X = String(args.check === true ? '' : args.check).trim().toLowerCase();
+  if (!A.isHex64(X)) die('usage: oberig anchor --check <receipt-hash|root>  (64 hex characters)');
+  const flagNet = typeof args.network === 'string' ? args.network : null;
+  let found = { root: X, receipt: null, proof: null, account: ctx.accountId || null, network: flagNet || 'mainnet', note: null };
+  const file = typeof args.proof === 'string' ? args.proof : typeof args.receipts === 'string' ? args.receipts : null;
+  if (file) {
+    let f;
+    try { f = A.loadFile(file); } catch (err) { die(err.message); }
+    if (f.kind === 'proof') {
+      const pr = f.proof;
+      const r = A.proofRoot(pr);
+      if (!r || !A.isHex64(pr.root)) die(`${file} is not a valid proof file`);
+      if (X !== pr.receipt && X !== pr.root) die(`${file} is a proof for another receipt`);
+      if (r !== pr.root) {
+        process.stdout.write(`\n  ${k.red('✗')} the proof in ${file} does not lead to its root. It proves nothing.\n\n`);
+        process.exitCode = 1;
+        return;
+      }
+      found = { root: pr.root, receipt: pr.receipt, proof: pr, account: ctx.flagAccount || pr.account, network: flagNet || pr.network || 'mainnet', note: `proof from ${path.basename(file)}` };
+    } else {
+      const { hashes, bad } = A.receiptHashes(f.items);
+      if (bad.length) die(`${file}: ${bad.length} receipt(s) do not match their hash or are not receipt hashes (${bad.slice(0, 3).join(', ')})`);
+      if (f.kind === 'anchor') {
+        const a = f.anchor;
+        if (!hashes.length || M.root(hashes).toString('hex') !== a.root) die(`${file} is damaged: its leaves do not give its root`);
+        if (X !== a.root && !hashes.includes(X)) die(`this hash is neither the root nor a receipt in ${file}`);
+        found = { root: a.root, receipt: X !== a.root ? X : null, proof: X !== a.root ? A.proofFor(hashes, X, a) : null, account: ctx.flagAccount || a.account, network: flagNet || a.network || 'mainnet', note: `leaves from ${path.basename(file)}` };
+      } else if (hashes.includes(X)) {
+        const meta = { network: flagNet || 'mainnet', account: ctx.accountId, contract: null };
+        found = { root: M.root(hashes).toString('hex'), receipt: X, proof: A.proofFor(hashes, X, meta), account: ctx.accountId || null, network: meta.network, note: `root of all ${hashes.length} receipts in ${path.basename(file)}` };
+      }
+    }
+  } else {
+    const gw = await A.fromGateway(ctx.port);
+    if (gw) {
+      const hit = (gw.anchors || []).slice().reverse().find((a) => a.root === X || (a.leaves || []).includes(X));
+      if (hit) {
+        const isRoot = hit.root === X;
+        found = { root: hit.root, receipt: isRoot ? null : X, proof: isRoot ? null : A.proofFor(hit.leaves, X, hit), account: ctx.flagAccount || hit.account, network: flagNet || hit.network, note: 'anchored earlier in this session' };
+      } else if ((gw.receipts || []).some((r) => r.hash === X)) {
+        process.stdout.write(`\n  ${k.red('✗')} this receipt is in the running session but has not been anchored yet. Run oberig anchor --send.\n\n`);
+        process.exitCode = 1;
+        return;
+      }
+    }
+  }
+  if (!found.account) die('which account anchored it? Pass --account <id> or set NEAR_ACCOUNT_ID');
+  if (found.proof && A.proofRoot(found.proof) !== found.root) {
+    process.stdout.write(`\n  ${k.red('✗')} the inclusion proof does not lead to the root. It proves nothing.\n\n`);
+    process.exitCode = 1;
+    return;
+  }
+  let net;
+  try { net = N.network(found.network); } catch (err) { die(err.message); }
+  const rpc = N.createRpc({ urls: net.rpc });
+  if (found.proof && found.proof.contract == null) found.proof.contract = net.social;
+  if (found.proof && found.proof.account == null) found.proof.account = found.account;
+  let c;
+  try { c = await A.check({ rpc, net, accountId: found.account, root: found.root }); } catch (err) { die(`view call failed: ${err.message}`); }
+  if (typeof args.out === 'string' && found.proof) writeJson(args.out, found.proof);
+  if (args.json) {
+    process.stdout.write(JSON.stringify({ root: found.root, receipt: found.receipt, network: net.id, contract: net.social, account: found.account, found: c.found, key: c.key, blockHeight: c.blockHeight || null, record: c.record || null, proof: found.proof }, null, 2) + '\n');
+    process.exitCode = c.found ? 0 : 1;
+    return;
+  }
+  const row = (key, val) => `  ${key.padEnd(10)}${val}`;
+  const out = ['', `  ${k.bold('OBERIG · anchor check')}`, ''];
+  if (found.receipt) {
+    out.push(row('receipt', found.receipt));
+    out.push(row('', `${k.gold('✓')} leaf ${found.proof.index + 1} of ${found.proof.size}; its proof (${found.proof.path.length} hash${found.proof.path.length === 1 ? '' : 'es'}) leads to the root`));
+  }
+  out.push(row('root', found.root));
+  if (found.note) out.push(row('', k.dim(found.note)));
+  out.push(row('network', `${net.name} · ${net.social}`));
+  out.push(row('record', c.key));
+  out.push('');
+  if (c.found) {
+    const r = c.record || {};
+    const when = typeof r.t === 'string' ? ` · sealed ${r.t.replace('T', ' ').replace('Z', ' UTC')}` : '';
+    out.push(`  ${k.gold('✓')} anchored on chain${c.blockHeight ? ` at block ${c.blockHeight}` : ''}${r.n ? ` · ${r.n} receipt${r.n === 1 ? '' : 's'}` : ''}${when}`);
+  } else {
+    out.push(`  ${k.red('✗')} no anchor record for this root under ${found.account} on ${net.name}`);
+  }
+  out.push('', `  ${k.dim('Checked with a free view call (SocialDB get). Nothing was signed or paid.')}`);
+  if (typeof args.out === 'string' && found.proof) out.push(`  ${k.dim('Proof written to ' + args.out + '; anyone can check it with oberig anchor --check <receipt> --proof <file>.')}`);
+  else if (typeof args.out === 'string') out.push(`  ${k.dim('No proof written: --out saves a proof when you check a receipt, not a root.')}`);
+  out.push('');
+  process.stdout.write(out.join('\n') + '\n');
+  process.exitCode = c.found ? 0 : 1;
+}
+
+async function cmdAnchor(args) {
+  const { A, N, T } = anchorDeps();
+  const k = ui.colors(ui.useColor());
+  const port = Number(args.port || process.env.OBERIG_PORT || 8790);
+  const flagAccount = typeof args.account === 'string' ? args.account.trim() : null;
+  const accountId = flagAccount || String(process.env.NEAR_ACCOUNT_ID || '').trim();
+  if (args.check !== undefined) return cmdAnchorCheck(args, { port, accountId, flagAccount });
+
+  let net;
+  try { net = N.network(typeof args.network === 'string' ? args.network : 'mainnet'); } catch (err) { die(err.message); }
+  let items;
+  let source;
+  if (typeof args.receipts === 'string') {
+    let f;
+    try { f = A.loadFile(args.receipts); } catch (err) { die(err.message); }
+    if (f.kind === 'proof') die('a proof file can be checked (--check), not anchored');
+    items = f.items;
+    source = args.receipts;
+  } else {
+    const gw = await A.fromGateway(port);
+    if (!gw) die(`no Oberig gateway answered on 127.0.0.1:${port}, and no --receipts file was given. Start the gateway (oberig start) or pass --receipts <file>.`);
+    items = gw.receipts;
+    source = `the running gateway (127.0.0.1:${port})`;
+  }
+  const { hashes, bad } = A.receiptHashes(items);
+  if (bad.length) die(`${bad.length} receipt(s) do not match their hash or are not receipt hashes (${bad.slice(0, 3).join(', ')}). Nothing was anchored.`);
+  if (!hashes.length) die('no receipts to anchor yet. Each request through the gateway adds one.');
+  if (!accountId) die('set NEAR_ACCOUNT_ID to your NEAR account (for example name.near) or pass --account <id>');
+  if (!T.isAccountId(accountId)) die(`"${accountId}" is not a valid NEAR account id`);
+
+  let signer = null;
+  if (process.env.NEAR_PRIVATE_KEY) {
+    try { signer = T.keyPairFromSecret(process.env.NEAR_PRIVATE_KEY); } catch (err) { die(err.message); }
+  }
+  if (args.send && !signer) die('--send needs NEAR_PRIVATE_KEY (ed25519:...) in the environment. Oberig never reads keys from files.');
+
+  const rpc = N.createRpc({ urls: net.rpc });
+  let p;
+  try { p = await A.plan({ rpc, net, accountId, signer, hashes }); } catch (err) { die(`could not read from ${net.name}: ${err.message}`); }
+
+  const head = ['', `  ${k.bold('OBERIG · anchor')}${args.send ? '' : '  ' + k.dim('dry run: only reads from the chain, nothing is signed or sent')}`, ''];
+  if (!args.send) {
+    if (typeof args.out === 'string') writeJson(args.out, A.anchorFile(p, null));
+    if (args.json) {
+      process.stdout.write(JSON.stringify(jsonPlan(p, net, A), null, 2) + '\n');
+      return;
+    }
+    const lines = [...head, ...planLines(p, { net, source, k, A }), ''];
+    lines.push(`  Nothing was sent. Add --send to sign with NEAR_PRIVATE_KEY and publish the root.`);
+    if (typeof args.out === 'string') lines.push(`  ${k.dim('Root and leaves written to ' + args.out + '.')}`);
+    lines.push('');
+    process.stdout.write(lines.join('\n') + '\n');
+    return;
+  }
+
+  if (p.problems.length) {
+    process.stdout.write([...head, ...planLines(p, { net, source, k, A }), '', '  Nothing was sent.', ''].join('\n') + '\n');
+    process.exitCode = 1;
+    return;
+  }
+  if (!args.json) process.stdout.write([...head, ...planLines(p, { net, source, k, A }), '', `  signing with ${signer.publicKeyText} and sending…`, ''].join('\n') + '\n');
+  let r;
+  try { r = await A.send(p, { rpc, net, signer }); } catch (err) { die(err.message); }
+  const anchor = { root: p.root, network: net.id, account: accountId, contract: net.social, tx: r.hash, block: r.blockHeight || null, leaves: hashes };
+  let told = false;
+  if (r.ok) {
+    told = await A.tellGateway(port, anchor);
+    if (typeof args.out === 'string') writeJson(args.out, A.anchorFile(p, r));
+  }
+  if (args.json) {
+    process.stdout.write(JSON.stringify({ ...jsonPlan(p, net, A), dryRun: false, sent: true, ok: r.ok, tx: r.hash, explorer: r.explorer, blockHeight: r.blockHeight || null, confirmed: !!r.confirmed, reason: r.reason || null }, null, 2) + '\n');
+    process.exitCode = r.ok ? 0 : 1;
+    return;
+  }
+  const out = [];
+  if (r.ok) {
+    out.push(`  ${k.gold('✓')} anchored${r.blockHeight ? ` at block ${r.blockHeight}` : ''} · ${p.count} receipt${p.count === 1 ? '' : 's'} · root ${p.root.slice(0, 8)}…${p.root.slice(-8)}`);
+    out.push(`  tx        ${r.hash}`);
+    out.push(`  explorer  ${r.explorer}`);
+    out.push(r.confirmed ? `  view      ${k.gold('✓')} the record reads back with a view call` : `  view      ${k.dim('not readable yet; it shows once the block is final (oberig anchor --check ' + p.root + ')')}`);
+    if (told) out.push(`  ${k.dim('The dashboard now marks these receipts as anchored.')}`);
+    if (typeof args.out === 'string') out.push(`  ${k.dim('Root and leaves written to ' + args.out + ': keep it to prove any receipt later.')}`);
+    else out.push(`  ${k.dim('Tip: --out <file> saves the leaves, so you can prove a receipt after the gateway stops.')}`);
+  } else {
+    out.push(`  ${k.red('✗')} not anchored: ${r.reason}`);
+    if (r.sent) out.push(`  tx        ${r.hash}`, `  explorer  ${r.explorer}`);
+  }
+  out.push('');
+  process.stdout.write(out.join('\n') + '\n');
+  process.exitCode = r.ok ? 0 : 1;
+}
+
+function jsonPlan(p, net, A) {
+  const c = p.cost;
+  return {
+    dryRun: true, network: net.id, rpc: net.rpc[0], contract: p.contract, method: 'set', account: p.accountId,
+    accountExists: !!p.account, balance: p.balance.toString(), signer: p.signer, accessKey: p.accessKey ? (p.accessKey.permission === 'FullAccess' ? 'FullAccess' : 'FunctionCall') : null,
+    socialdbRegistered: p.registered, receipts: p.count, root: p.root, key: p.key, value: p.value,
+    cost: { bytes: c.bytes, storageNear: A.near(c.keep), depositYocto: c.deposit.toString(), depositNear: A.near(c.deposit), gas: c.gas.toString(), gasUsedNear: A.near(c.gasUsed), gasHeldNear: A.near(c.gasHeld), neededNear: A.near(c.needed) },
+    problems: p.problems,
+  };
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const cmd = args._[0];
@@ -236,6 +494,7 @@ async function main() {
     if (cmd === 'shield') return cmdShield(args);
     if (cmd === 'scrub') return await cmdScrub(args);
     if (cmd === 'setup') return cmdSetup();
+    if (cmd === 'anchor') return await cmdAnchor(args);
   } catch (err) {
     die(err.message);
   }
