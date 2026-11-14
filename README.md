@@ -19,7 +19,7 @@ Built for NEAR AI Cloud (`cloud-api.near.ai`): every model request goes there, w
 
 On 14 Nov 2026, against NEAR AI Cloud (DeepSeek V4.1 Flash 1017):
 
-- **Claude Code.** A real `claude -p` run through Oberig on a small project whose README hides two instructions: 3 requests, every answer's signature verified with the model's TEE key, the 3 keys in its `.env` masked, both hidden instructions stopped. The dashboard above is from that run.
+- **Claude Code.** A real `claude -p` run through Oberig 0.2.0 on a small project whose README hides two instructions: 3 requests, every answer's signature verified with the model's TEE key, the 3 keys in its `.env` masked, both hidden instructions stopped. The dashboard above is from that run.
 - **Codex and OpenCode style requests.** Responses requests (streaming, and a tool loop with a function call and its result) and Chat Completions requests (plain, streaming, with a tool): every answer's signature verified.
 - **Verify.** `oberig verify` passed every local check. With `OBERIG_VERIFY=full`: Intel TCB status UpToDate for the model and the gateway, Intel's TCB info, QE identity and revocation lists signed and current, and 16 of 16 GPUs passing in NVIDIA's signed NRAS tokens.
 - **Anchor.** The `oberig anchor` dry run read NEAR mainnet and testnet. Nothing has been anchored on mainnet yet.
@@ -354,7 +354,7 @@ Visible plain-text injections are out of scope: the shield looks for instruction
 
 ## Seal
 
-<img src="docs/seal-8a1a-stitching.gif" width="180" align="right" alt="Seal 8a1a from the run above, stitched cross by cross">
+<img src="docs/seal-bdff-stitching.gif" width="180" align="right" alt="Seal bdff from the run above, stitched cross by cross">
 
 Every request gets a receipt, kept in memory with metadata only: time, client, model, attestation status (signer, nonce), response signature status and kind, masked counts, shield findings, SHA-256 of the request and response bytes, HTTP status, timing, and a short id. From the receipt's own hash Oberig draws a deterministic cross-stitch seal in the vyshyvanka tradition (8-fold symmetry, red, black and a little gold). The same receipt always gives the same seal.
 
