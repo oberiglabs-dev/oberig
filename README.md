@@ -329,6 +329,4 @@ Project layout: `bin/oberig.js` (CLI), `src/server.js` (gateway), `src/verify.js
 - Secret patterns follow the shape of common open-source secret scanners.
 - Libraries: none. Only Node.js built-ins.
 
-Independent open-source project. Not affiliated with NEAR.
-
 MIT License. See [LICENSE](LICENSE).
