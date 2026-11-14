@@ -1,0 +1,184 @@
+{
+ "source": "NEAR mainnet, read on 14 Nov 2026 with EXPERIMENTAL_tx_status (rpc.mainnet.near.org). The RPC view of a transaction has no block hash, so signed_block_hash is the block, walking back from the inclusion block, whose hash makes the re-serialized transaction hash equal the on-chain hash. A SHA-256 match is only possible when every byte is right.",
+ "txs": [
+  {
+   "label": "SocialDB set (FunctionCall)",
+   "transaction": {
+    "actions": [
+     {
+      "FunctionCall": {
+       "args": "eyJkYXRhIjp7ImNyYXRlcy51bnJsemQubmVhciI6eyJ1bnJsemQiOnsiY3JhdGVzIjp7ImRheSI6IntcImNoYWluX3Jvb3RcIjpcImU1NGEwNTY3ZmM0ZWM5ZWY2YTUwYWNiNGFhMmVlZGY4ZWQ4YjU3ODlkODYxZWU2ZmNhNzg1ZjJmMzJlMDIyMTZcIixcImRheVwiOjIwNzcwLFwiZHJvcHNfcm9vdFwiOlwiMmYzOTk1YjQ0YmJiMWU1YjM4ZDhhM2NiZjgxNTQ0ZjdiZjZmYzc5MTdlNTJkOTkxNWQ1OGFmMjk0YTFlODBhNlwiLFwiaG9sZGluZ3Nfcm9vdFwiOlwiNGNmNzczYmJjNWMyMGU1Y2QzNTk4MDM0N2U4ZDllNjMxYTZhZjZhOWRjNzg2NmVhODNiZGYwOGIxZTI5MTgyZFwiLFwicG9pbnRzX3Jvb3RcIjpcIjYwYmQwZmJhYTg5NGU2NTk1ZGEwOWZlZWQ0N2VkNDlhZWZkYTU1NDMxOWE4ZDIyY2YxYzdlY2JjY2JkMDM1YWFcIixcInB1YmxpY19zaGEyNTZcIjpcIjdlYzAyZTBlMWE4OTcwNTA3YjQyZWUyYjMyNmRkM2JmY2VlZjc2MjNlNzcyNGIwYmFiMzkzZjg3MjE0NmE1OTNcIixcInN0YXRlX3Jvb3RcIjpcIjM0Mzk4OWUwYWFiN2EwZGE0YmFlNDY4MGQwMzg1ZjY5M2U4NDM4NGYwZGU0YmRkZDk2YTI2OTM5NDAxZTkwZGJcIixcInN0YXRlbWVudF9zaGEyNTZcIjpcImEwNDQwNThiMzRhODMxZGJlNDc1OWRlZjkwNzZlYzFhODcwMjM2NjdjZjJlZGU5ZTJkZGI0MGEzNDkwNDQyNTRcIixcInZcIjoyfSJ9fX19fQ==",
+       "deposit": "0",
+       "gas": 30000000000000,
+       "method_name": "set"
+      }
+     }
+    ],
+    "hash": "g3xbeWzhWPx2Uq94DyQTpEUKTDuznQp9DYfA6oz2NqV",
+    "nonce": 220651569000170,
+    "priority_fee": 0,
+    "public_key": "ed25519:BaSCBkJucD59mr4akVgH4h3wjsiji7iqb89bVBVJwSv8",
+    "receiver_id": "social.near",
+    "signature": "ed25519:5pGHwtKaUaKU2xJtoa94wuced6CXK7y5ddF6i756bLoozoT4zsWh3Nuei9VcUWnBxp2ioNGHwVfsFejJGBPSXmDc",
+    "signer_id": "crates.unrlzd.near"
+   },
+   "signed_block_hash": "ApNBKwb3Z9kcagVdDjzKAFoFRsA3Z1WQHbEsLvKcLRYd",
+   "signed_block_height": 224436003,
+   "included_in_block_hash": "9bmtE3trfNBnkLr2Vid59VCsk9cZFMS65A6QCzQUbd5C",
+   "status": {
+    "SuccessValue": "eyJibG9ja19oZWlnaHQiOiIyMjQ0MzYwMDkifQ=="
+   },
+   "gas": {
+    "conversion": {
+     "gas_burnt": 341008947065,
+     "tokens_burnt": "34100894706500000000"
+    },
+    "receipts": [
+     {
+      "executor_id": "social.near",
+      "gas_burnt": 3337048199694,
+      "tokens_burnt": "333704819969400000000"
+     },
+     {
+      "executor_id": "crates.unrlzd.near",
+      "gas_burnt": 223182562500,
+      "tokens_burnt": "0"
+     }
+    ]
+   }
+  },
+  {
+   "label": "meta transaction (Delegate with a FunctionCall)",
+   "transaction": {
+    "actions": [
+     {
+      "Delegate": {
+       "delegate_action": {
+        "actions": [
+         {
+          "FunctionCall": {
+           "args": "e30=",
+           "deposit": "0",
+           "gas": 300000000000000,
+           "method_name": "claim"
+          }
+         }
+        ],
+        "max_block_height": 224452289,
+        "nonce": 223201427000004,
+        "public_key": "ed25519:2UUk2zG72gGuuH2p3QZUUYkZfsDMLTgtr5AS8KcyFMJ7",
+        "receiver_id": "claim.sweat",
+        "sender_id": "04a8b892fb7a90b9a6cec06e176c1577dfbd45b39c699074f53a141fbf01fde3"
+       },
+       "signature": "ed25519:2sgPfx9HM4j7agh78hta28Hbv89B63LdYgVLYignRwCmeskhWsnQEtuMdBYdJpnkT1acdiv7h5nmvP9kWUSETFhz"
+      }
+     }
+    ],
+    "hash": "5MYdaMGTDsAypPWHiMR9o7C7YufZM5dDw5s3i3ZVxt1L",
+    "nonce": 195456658183438,
+    "priority_fee": 0,
+    "public_key": "ed25519:45tvfoQBSoR2UjiRdg3z3A5G9bhdkSGDnxEsjapyBp8J",
+    "receiver_id": "04a8b892fb7a90b9a6cec06e176c1577dfbd45b39c699074f53a141fbf01fde3",
+    "signature": "ed25519:5F25Ghq7AEhTzHwHbzzVJX5TVrzWXxoXBSJWxrfSyZf9b5ejnj2ZNJV5qHw2EJvAcUycFHBNmCuDTJGxqVUaoJsv",
+    "signer_id": "sweat-relayer.near"
+   },
+   "signed_block_hash": "7HSShKTXJ3swSFs6JBmm7LZ9XpkH23fKWENBNtf2NZaz",
+   "signed_block_height": 224451288,
+   "included_in_block_hash": "3HYHh7LfneN4LMvPrrfMtN9xxg1zLXzrUrucBjHkhUkE",
+   "status": {
+    "SuccessValue": ""
+   },
+   "gas": {
+    "conversion": {
+     "gas_burnt": 508393286005,
+     "tokens_burnt": "50839328600500000000"
+    },
+    "receipts": [
+     {
+      "executor_id": "04a8b892fb7a90b9a6cec06e176c1577dfbd45b39c699074f53a141fbf01fde3",
+      "gas_burnt": 508393286005,
+      "tokens_burnt": "50839328600500000000"
+     },
+     {
+      "executor_id": "claim.sweat",
+      "gas_burnt": 2457306772653,
+      "tokens_burnt": "245730677265300000000"
+     },
+     {
+      "executor_id": "token.sweat",
+      "gas_burnt": 2219827476134,
+      "tokens_burnt": "221982747613400000000"
+     },
+     {
+      "executor_id": "sweat-relayer.near",
+      "gas_burnt": 223182562500,
+      "tokens_burnt": "0"
+     },
+     {
+      "executor_id": "claim.sweat",
+      "gas_burnt": 1798801420791,
+      "tokens_burnt": "179880142079100000000"
+     },
+     {
+      "executor_id": "sweat-relayer.near",
+      "gas_burnt": 223182562500,
+      "tokens_burnt": "0"
+     },
+     {
+      "executor_id": "sweat-relayer.near",
+      "gas_burnt": 223182562500,
+      "tokens_burnt": "0"
+     },
+     {
+      "executor_id": "sweat-relayer.near",
+      "gas_burnt": 223182562500,
+      "tokens_burnt": "0"
+     }
+    ]
+   }
+  },
+  {
+   "label": "Transfer",
+   "transaction": {
+    "actions": [
+     {
+      "Transfer": {
+       "deposit": "1280000000000000000000"
+      }
+     }
+    ],
+    "hash": "2DxF45NY3gCQUWFN2QiNct1WhUBXdzyy7cei21ZRWjLz",
+    "nonce": 186263452047932,
+    "priority_fee": 0,
+    "public_key": "ed25519:7r9YdTv6TGpWaC6FW5MWjA3h2EAiASsDuvGmCsCEjyEv",
+    "receiver_id": "agent-api-deployments.sputnik-dao.near",
+    "signature": "ed25519:4LvoynVwZgp9FWMarXHjFBWy1AzhbdtLqzcQDZLsTWjSSPG5jTxyAPvB6SFQbrcFpJssCnsPxgzWTiCg2PYFzVH",
+    "signer_id": "sponsor.trezu.near"
+   },
+   "signed_block_hash": "h8SNXwgRWAkbkKfsho3WL5TPyms1JV7Y5xyDu1g9BK5",
+   "signed_block_height": 224451263,
+   "included_in_block_hash": "4rFGsufCq9UjN6zbihJJS137dt7ABHSUrFzGGH4HHwnE",
+   "status": {
+    "SuccessValue": ""
+   },
+   "gas": {
+    "conversion": {
+     "gas_burnt": 223182562500,
+     "tokens_burnt": "22318256250000000000"
+    },
+    "receipts": [
+     {
+      "executor_id": "agent-api-deployments.sputnik-dao.near",
+      "gas_burnt": 223182562500,
+      "tokens_burnt": "22318256250000000000"
+     },
+     {
+      "executor_id": "sponsor.trezu.near",
+      "gas_burnt": 223182562500,
+      "tokens_burnt": "0"
+     }
+    ]
+   }
+  }
+ ]
+}

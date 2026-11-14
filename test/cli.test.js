@@ -15,7 +15,7 @@ test('--version and --help', () => {
   assert.equal(run(['--version']).stdout.trim(), 'oberig 0.1.0');
   const h = run(['--help']);
   assert.equal(h.status, 0);
-  for (const cmd of ['start', 'verify', 'shield', 'scrub', 'setup']) assert.ok(h.stdout.includes(`oberig ${cmd}`), cmd);
+  for (const cmd of ['start', 'verify', 'shield', 'scrub', 'setup', 'anchor']) assert.ok(h.stdout.includes(`oberig ${cmd}`), cmd);
 });
 
 test('shield <file> lists findings and exits 1, clean file exits 0', () => {

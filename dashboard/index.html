@@ -48,6 +48,10 @@
   .seal .id { font: 11px/1 var(--mono); color: var(--mute); }
   .seal:hover .id, .seal:focus-visible .id, .seal.sel .id { color: var(--gold); }
   .seal.sel svg { box-shadow: 0 0 0 2px var(--gold); }
+  .anch { color: var(--gold); }
+  .seal .anch { margin-left: 3px; }
+  .status a, .receipt a { color: var(--gold); text-decoration: none; border-bottom: 1px solid rgba(232,176,74,.35); }
+  .status a:hover, .receipt a:hover { border-bottom-color: var(--gold); }
   .empty { color: var(--dim); font-size: 14px; padding: 18px 8px; line-height: 1.7; }
   .empty code { font-family: var(--mono); color: var(--linen); background: var(--panel2); padding: 1px 6px; border-radius: 4px; }
   .grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; margin-top: 22px; }
@@ -114,7 +118,8 @@
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   var params = new URLSearchParams(location.search);
   var demo = params.has('demo');
-  var state = { receipts: [], counters: {}, attestation: null, model: '', guards: {} };
+  var state = { receipts: [], counters: {}, attestation: null, model: '', guards: {}, anchors: [] };
+  var anchoredBy = {}; // receipt hash -> the latest anchor whose root includes it
   var selected = null;
   var $ = function (id) { return document.getElementById(id); };
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
@@ -139,13 +144,33 @@
     requestAnimationFrame(frame);
   }
 
+  var netName = function (n) { return n === 'testnet' ? 'NEAR testnet' : 'NEAR mainnet'; };
+  var shortTx = function (t) { t = String(t || ''); return t.slice(0, 6) + '…' + t.slice(-4); };
+  // Explorer links are built by the gateway from the network and the transaction hash.
+  var txLink = function (an) { return /^https:\/\/(testnet\.)?nearblocks\.io\/txns\/[1-9A-HJ-NP-Za-km-z]{32,64}$/.test(an.explorer || '') ? '<a href="' + esc(an.explorer) + '" target="_blank" rel="noopener noreferrer">tx ' + esc(shortTx(an.tx)) + '</a>' : 'tx ' + esc(shortTx(an.tx)); };
+
+  function indexAnchors() {
+    anchoredBy = {};
+    state.anchors.forEach(function (an) { (an.hashes || []).forEach(function (h) { anchoredBy[h] = an; }); });
+  }
+
   function renderStatus() {
     var a = state.attestation, g = state.guards || {};
     var ver = !a ? 'checking…' : a.ok ? '<span class="ok">✓</span> enclave attested · signer <b>' + esc(short(a.signer)) + '</b>' : '<span class="bad">✗</span> not attested · ' + esc(a.error || '');
+    var last = state.anchors[state.anchors.length - 1];
     $('status').innerHTML =
       'Enclave&nbsp; <b>NEAR AI · ' + esc(state.model) + '</b><br>' +
       'Verified ' + ver + '<br>' +
-      'Guards&nbsp;&nbsp; mask ' + (g.mask === false ? 'off' : 'on') + ' · shield ' + (g.shield === 'block' || !g.shield ? 'on' : esc(g.shield)) + ' · seals on';
+      'Guards&nbsp;&nbsp; mask ' + (g.mask === false ? 'off' : 'on') + ' · shield ' + (g.shield === 'block' || !g.shield ? 'on' : esc(g.shield)) + ' · seals on' +
+      (last ? '<br>Anchored <span class="anch">◈</span> ' + last.count + ' receipt' + (last.count === 1 ? '' : 's') + ' · ' + netName(last.network) + ' · ' + txLink(last) : '');
+  }
+
+  function markSeals() {
+    document.querySelectorAll('.seal').forEach(function (b) {
+      var on = !!anchoredBy[b.dataset.id], has = b.querySelector('.anch');
+      if (on && !has) { var s = document.createElement('span'); s.className = 'anch'; s.title = 'anchored on NEAR'; s.textContent = '◈'; b.querySelector('.id').appendChild(s); }
+      if (!on && has) has.remove();
+    });
   }
 
   function renderCounters() {
@@ -163,7 +188,7 @@
     b.className = 'seal'; b.type = 'button'; b.setAttribute('role', 'listitem');
     b.setAttribute('aria-label', 'Seal ' + r.id + ', ' + (VERDICT[r.verdict] || [r.verdict])[0] + ', ' + hms(r.time));
     b.dataset.id = r.hash;
-    b.innerHTML = sealSvg(r, animate && !reduce ? 0 : 1) + '<span class="id">' + esc(r.id) + '</span>';
+    b.innerHTML = sealSvg(r, animate && !reduce ? 0 : 1) + '<span class="id">' + esc(r.id) + (anchoredBy[r.hash] ? '<span class="anch" title="anchored on NEAR">◈</span>' : '') + '</span>';
     b.addEventListener('mouseenter', function () { showReceipt(r); });
     b.addEventListener('focus', function () { showReceipt(r); });
     b.addEventListener('click', function () { selected = r.hash; showReceipt(r); });
@@ -187,7 +212,7 @@
       var v = VERDICT[r.verdict] || [r.verdict, ''];
       return '<tr data-id="' + esc(r.hash) + '"' + (selected === r.hash ? ' class="sel"' : '') + '><td>' + hms(r.time) + '</td><td class="v">' + esc(r.client) + '</td><td class="' + v[1] + '">' + esc(v[0]) +
         '</td><td>' + ((r.masked && r.masked.total) || 0) + '</td><td>' + ((r.shield && r.shield.stopped) || 0) + '</td><td>' + esc(r.status) +
-        '</td><td>' + ((r.ms || 0) / 1000).toFixed(1) + 's</td><td class="v">' + esc(r.id) + '</td></tr>';
+        '</td><td>' + ((r.ms || 0) / 1000).toFixed(1) + 's</td><td class="v">' + esc(r.id) + (anchoredBy[r.hash] ? ' <span class="anch" title="anchored on NEAR">◈</span>' : '') + '</td></tr>';
     });
     $('rows').innerHTML = rows.join('') || '<tr><td colspan="8">no requests yet</td></tr>';
   }
@@ -197,6 +222,11 @@
     if (s.status === 'verified') return '✓ verified · ' + (s.kind === 'provider_tee' ? 'model TEE key' : 'gateway key');
     if (s.status === 'failed') return '✗ ' + (s.reason || 'failed');
     return 'unavailable' + (s.reason ? ' · ' + s.reason : '');
+  }
+
+  function anchorText(an) {
+    if (!an) return 'not yet · <span style="color:var(--mute)">oberig anchor</span>';
+    return '<span class="anch">◈</span> ' + netName(an.network) + ' · ' + esc(an.account) + (an.block ? ' · block ' + esc(an.block) : '') + ' · root ' + esc(String(an.root).slice(0, 8)) + '… · ' + txLink(an);
   }
 
   function showReceipt(r) {
@@ -219,6 +249,7 @@
       '<dt>response</dt><dd>sha256 ' + esc(String(r.responseHash || '').slice(0, 16)) + '…</dd>' +
       '<dt>status</dt><dd>' + esc(r.status) + ' · ' + ((r.ms || 0) / 1000).toFixed(1) + 's' + (r.tokens ? ' · ' + (r.tokens.in || 0) + ' in / ' + (r.tokens.out || 0) + ' out' : '') + '</dd>' +
       '<dt>receipt</dt><dd>sha256 ' + esc(String(r.hash).slice(0, 16)) + '…</dd>' +
+      '<dt>anchored</dt><dd>' + anchorText(anchoredBy[r.hash]) + '</dd>' +
       '</dl>' +
       '<div class="note">The hashes cover the exact bytes sent to and received from NEAR AI (after masking). All instances of a model share one signing key, so a signer match shows the attested key signed the answer, not which machine.</div>';
   }
@@ -230,6 +261,8 @@
   function load(snap) {
     state.model = snap.model; state.guards = snap.guards || {}; state.attestation = snap.attestation; state.counters = snap.counters || {};
     state.receipts = snap.receipts || [];
+    state.anchors = snap.anchors || [];
+    indexAnchors();
     $('seals').innerHTML = '';
     if (!state.receipts.length) emptyBand();
     state.receipts.slice().reverse().forEach(function (r) { addSeal(r, false); });
@@ -270,9 +303,12 @@
         signature: i === 6 ? { status: 'unavailable', reason: 'signature not found' } : { status: 'verified', kind: 'provider_tee' },
         requestHash: hex(i + 100), responseHash: hex(i + 200), tokens: { in: 1200 + i * 310, out: 90 + i * 17 } });
     }
+    // ?demo&anchored also shows a sample anchor (placeholder account, no explorer link).
+    var demoAnchors = params.has('anchored') ? [{ root: hex(999), network: 'mainnet', account: 'your-account.near', contract: 'social.near', tx: '9Xq3demo' + hex(998).slice(0, 8), block: null,
+      count: Math.max(1, n - 3), hashes: list.slice(3).map(function (r) { return r.hash; }) }] : [];
     load({ model: 'deepseek-ai/DeepSeek-V4.1-Flash-1017', guards: { mask: true, shield: 'block' },
       attestation: { ok: true, signer: '236f5a6b91dd47dc3b7b36e43d4eb531a042ffb8f8fbf3a1555b78cef4fdda4c' },
-      counters: { verifiedAnswers: n - 1, secretsKeptHome: 6, hiddenStopped: 2, tracesScrubbed: 3 }, receipts: list });
+      counters: { verifiedAnswers: n - 1, secretsKeptHome: 6, hiddenStopped: 2, tracesScrubbed: 3 }, receipts: list, anchors: demoAnchors });
     return;
   }
 
@@ -281,6 +317,14 @@
   es.addEventListener('receipt', function (e) { var d = JSON.parse(e.data); onReceipt(d.receipt, d.counters); });
   es.addEventListener('attestation', function (e) { state.attestation = JSON.parse(e.data); renderStatus(); });
   es.addEventListener('counters', function (e) { state.counters = JSON.parse(e.data); renderCounters(); });
+  es.addEventListener('anchored', function (e) {
+    var an = JSON.parse(e.data);
+    state.anchors = state.anchors.filter(function (x) { return !(x.root === an.root && x.network === an.network && x.account === an.account); });
+    state.anchors.push(an);
+    indexAnchors(); markSeals(); renderRows(); renderStatus();
+    var cur = state.receipts.find(function (x) { return x.hash === selected; }) || state.receipts[0];
+    if (cur) showReceipt(cur);
+  });
   es.onerror = function () { $('status').innerHTML = 'gateway disconnected · reconnecting…'; };
   es.onopen = function () { renderStatus(); };
 })();
