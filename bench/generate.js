@@ -457,7 +457,7 @@ const TECHNIQUES = {
   'bidi': { label: 'Bidi controls', pool: 'general', kinds: CHAR_KINDS },
   'css-hidden': { label: 'CSS-hidden HTML', pool: 'general', kinds: ['html-page', 'email-html', 'json:html-page'] },
   'hidden-attr': { label: 'Hidden alt / title attribute', pool: 'general', kinds: ['readme', 'issue', 'html-page', 'email-html', 'json:readme', 'json:html-page'] },
-  'override-hidden': { label: '"Ignore previous instructions" in a hidden carrier', pool: 'override', kinds: HIDDEN_KINDS },
+  'override-hidden': { label: 'Override phrase ("ignore previous …") in a hidden carrier', pool: 'override', kinds: HIDDEN_KINDS },
   'remote-exec-hidden': { label: 'curl | sh or iwr | iex in a hidden carrier', pool: 'remote', kinds: HIDDEN_KINDS },
   'exfil-link': { label: 'Markdown image / link exfiltration', pool: 'exfil', kinds: ['readme', 'issue', 'html-page', 'email-html', 'json:readme', 'json:issue'] },
 };
@@ -553,7 +553,7 @@ function visible() {
     const kind = ['readme', 'issue', 'email-text'][i % 3];
     out.push({ id: `visible-${String(i + 1).padStart(3, '0')}`, technique: 'visible', group: 'plain', carrier: kind.replace('-text', ''), lang: phr.lang, split: phr.split, marker: phr.text, text: insert(blocksFor(kind, proj), phr.text, rng(i + 1), kind) });
   }
-  // the same, with "ignore previous instructions" style phrasings (English ones), written in plain view
+  // the same, with the English override phrasings, written in plain view
   const ovr = splitPhrasings(OVERRIDE).filter((p) => p.lang === 'en');
   ovr.forEach((phr, i) => {
     const kind = ['readme', 'issue', 'email-text'][i % 3];

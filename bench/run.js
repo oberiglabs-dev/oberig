@@ -191,7 +191,7 @@ function printConsole(sum, base, meta) {
   L.push(`English ${fmt(sum.english)}; other languages ${fmt(sum.other)}`);
   L.push(`block mode left nothing of the hidden part behind in ${sum.removed.ok}/${sum.removed.n} detected non-JSON samples`);
   L.push(`carrier documents alone: ${meta.carrierFindings} findings`);
-  L.push(`visible plain-text injections (out of scope): ${fmt(sum.controls)}; visible "ignore previous instructions" style: ${fmt(sum.controlsOverride)}`);
+  L.push(`visible plain-text injections (out of scope): ${fmt(sum.controls)}; visible override phrasings: ${fmt(sum.controlsOverride)}`);
   L.push(`timing: ordinary docs median ${t.negMedian.toFixed(2)} ms, p95 ${t.negP95.toFixed(2)} ms, max ${t.negMax.toFixed(1)} ms, ${t.mbps.toFixed(1)} MB/s over ${t.mb.toFixed(1)} MB; samples median ${t.posMedian.toFixed(3)} ms`);
   if (argv.includes('--misses')) {
     L.push('', 'MISSED SAMPLES');
@@ -273,7 +273,7 @@ ${devMisses ? `${devMisses} of the ${sum.misses.length} misses use dev phrasings
 
 The shield looks for instructions hidden from the person: comments, invisible characters, hidden HTML, attributes, links that carry data. An instruction written in plain view, as an ordinary sentence, is not its target. It reads like any other sentence, and a pattern scanner cannot tell it from documentation without understanding intent.
 
-Measured for reference on ${sum.controls.n} visible injections (the same instruction phrasings written as a normal paragraph of a README, issue or email): **${fmt(sum.controls)} detected**. In plain view the shield only acts on "ignore previous instructions" style directives and on remote-script commands aimed at the agent; the ${sum.controlsOverride.n} English override phrasings of the corpus, written in plain view, are caught in ${fmt(sum.controlsOverride)}. Example that passes:
+Measured for reference on ${sum.controls.n} visible injections (the same instruction phrasings written as a normal paragraph of a README, issue or email): **${fmt(sum.controls)} detected**. In plain view the shield only acts on override directives (such as "ignore all previous …" or fake chat-template markers) and on remote-script commands aimed at the agent; the ${sum.controlsOverride.n} English override phrasings of the corpus, written in plain view, are caught in ${fmt(sum.controlsOverride)}. Example that passes:
 
 \`\`\`
 ${meta.visibleMiss}
