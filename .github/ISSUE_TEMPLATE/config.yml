@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/oberiglabs-dev/oberig/security/policy
+    about: Please report security problems privately. This page says how.
+  - name: Agent setup (Claude Code, Codex, OpenCode)
+    url: https://github.com/oberiglabs-dev/oberig#connect-your-agent
+    about: The settings for each agent are in the README.

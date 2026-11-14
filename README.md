@@ -330,7 +330,7 @@ Every other path returns 404. Nothing is passed through to any other service.
 - The dashboard is served with a strict Content-Security-Policy and loads no third-party resources.
 - Zero dependencies: only Node.js built-ins (`node:http`, `node:crypto`, `node:fs`).
 
-Found a problem? Open an issue at https://github.com/oberiglabs-dev/oberig/issues. For anything sensitive, please ask for a private contact first.
+Found a problem? Open an issue at https://github.com/oberiglabs-dev/oberig/issues. For a security problem, please report it privately as [SECURITY.md](SECURITY.md) describes.
 
 ## Development
 
