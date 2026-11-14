@@ -11,6 +11,10 @@ Four verbs: **Verify · Mask · Shield · Seal.** A fifth tool, **Scrub**, clean
 - Zero dependencies. Node.js 18.17 or newer. MIT.
 - Windows, macOS and Linux.
 
+### How it relates to NEAR AI's own tools
+
+NEAR AI Gateway (with its IronWire local proxy) gets your agent to NEAR AI private models in a click, and nearai-cloud-verifier checks attestation reports on demand. Oberig is a small, separate layer you can read in one sitting: it checks the attestation before the first request and every answer's signature after it, refuses to send when a check fails, masks secrets so the enclave never sees them, strips hidden instructions from tool results, and runs the same on Windows, macOS and Linux. It has not been tested together with the Gateway app.
+
 *Oberig (оберіг) is Ukrainian for a protective amulet. In folk embroidery, the stitched pattern itself was the oberig.*
 
 ---
@@ -46,7 +50,7 @@ Privacy    runs only on this computer · stores nothing · no telemetry
 Address    http://127.0.0.1:8790  (dashboard: open it in a browser)
 ```
 
-Then point your agent at it (next section). Each request prints one metadata-only line:
+Then point your agent at it (next section). Each request prints one metadata-only line, for example:
 
 ```
 14:05:02  claude-code → near ✓ verified  ◆ masked 2  ⚑ stopped 1  200  1.8s  seal 7f3a
