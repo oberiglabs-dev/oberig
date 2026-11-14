@@ -31,6 +31,8 @@ Usage
   oberig setup               how to connect Claude Code, Codex and OpenCode
   oberig --version | --help
 
+  Without installing: npx github:oberiglabs-dev/oberig [command]
+
 Environment
   NEARAI_API_KEY             your NEAR AI Cloud key (NEAR_AI_API_KEY also works)
   OBERIG_MODEL               default deepseek-ai/DeepSeek-V4.1-Flash-1017
@@ -179,45 +181,53 @@ async function cmdScrub(args) {
 function cmdSetup() {
   const port = Number(process.env.OBERIG_PORT || 8790);
   const base = `http://127.0.0.1:${port}`;
+  const model = process.env.OBERIG_MODEL || 'deepseek-ai/DeepSeek-V4.1-Flash-1017';
   process.stdout.write(`
   OBERIG · setup
 
   1. Start Oberig with your NEAR AI key in the environment
-     (from the repo folder; after "npm install -g ." you can type oberig instead)
 
-     PowerShell        $env:NEARAI_API_KEY = "<your key>"; node bin/oberig.js
-     macOS / Linux     NEARAI_API_KEY="<your key>" node bin/oberig.js
+     PowerShell        $env:NEARAI_API_KEY = "<your key>"; npx github:oberiglabs-dev/oberig
+     macOS / Linux     NEARAI_API_KEY="<your key>" npx github:oberiglabs-dev/oberig
+
+     From a clone of the repo, use node bin/oberig.js instead of npx github:oberiglabs-dev/oberig.
+     If PowerShell says running scripts is disabled, type npx.cmd instead of npx.
 
   2. Point your agent at it (any model name works; Oberig always uses
-     ${process.env.OBERIG_MODEL || 'deepseek-ai/DeepSeek-V4.1-Flash-1017'} on NEAR AI)
+     ${model} on NEAR AI)
 
   Claude Code
      PowerShell        $env:ANTHROPIC_BASE_URL = "${base}"; $env:ANTHROPIC_AUTH_TOKEN = "oberig"; claude
      macOS / Linux     ANTHROPIC_BASE_URL=${base} ANTHROPIC_AUTH_TOKEN=oberig claude
 
-  Codex (~/.codex/config.toml)
-     model = "deepseek-ai/DeepSeek-V4.1-Flash-1017"
+  Codex (~/.codex/config.toml; the first two lines go above any [section])
+     model = "${model}"
      model_provider = "oberig"
 
      [model_providers.oberig]
      name = "Oberig"
      base_url = "${base}/v1"
-     wire_api = "chat"
+
+     Codex speaks the Responses API. Oberig serves it at /v1/responses.
 
   OpenCode (opencode.json)
      {
-       "provider": {
+       "$schema": "https://opencode.ai/config.json",
+       "model": "oberig/${model}",
+       "providers": {
          "oberig": {
-           "npm": "@ai-sdk/openai-compatible",
            "name": "Oberig",
-           "options": { "baseURL": "${base}/v1" },
-           "models": { "deepseek-ai/DeepSeek-V4.1-Flash-1017": {} }
+           "package": "@opencode/ai/providers/openai-compatible",
+           "settings": { "baseURL": "${base}/v1" },
+           "models": { "${model}": {} }
          }
-       },
-       "model": "oberig/deepseek-ai/DeepSeek-V4.1-Flash-1017"
+       }
      }
 
-  Any other OpenAI-compatible tool: base URL ${base}/v1
+     OpenCode 1.x uses the older shape: "provider" with
+     "npm": "@ai-sdk/openai-compatible" and "options": { "baseURL": "${base}/v1" }.
+
+  Any other OpenAI-compatible tool: base URL ${base}/v1 (Chat Completions or Responses).
   The agent's own API key is ignored and never forwarded.
 
   Dashboard: ${base}/

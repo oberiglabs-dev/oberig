@@ -54,6 +54,9 @@ test('scrub <file> writes a sanitised copy and prints a summary', () => {
 test('setup prints the agent settings', () => {
   const r = run(['setup']);
   assert.match(r.stdout, /ANTHROPIC_BASE_URL/);
-  assert.match(r.stdout, /wire_api = "chat"/);
-  assert.match(r.stdout, /@ai-sdk\/openai-compatible/);
+  assert.match(r.stdout, /npx github:oberiglabs-dev\/oberig/);
+  assert.match(r.stdout, /\[model_providers\.oberig\]/);
+  assert.doesNotMatch(r.stdout, /wire_api/, 'current Codex only speaks the Responses API');
+  assert.match(r.stdout, /\/v1\/responses/);
+  assert.match(r.stdout, /"package": "@opencode\/ai\/providers\/openai-compatible"/);
 });

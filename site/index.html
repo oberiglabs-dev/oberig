@@ -218,26 +218,38 @@
             </div>
             <div class="tabpanel" role="tabpanel" id="panel-ps" aria-labelledby="tab-ps">
               <div class="cmd">
-                <p class="cmd-label"><span class="n">1</span>Get Oberig</p>
-                <div class="cmd-box"><code>git clone https://github.com/oberiglabs-dev/oberig; cd oberig</code><button type="button" class="copy-btn" aria-label="Copy command 1 for PowerShell">Copy</button></div>
+                <p class="cmd-label"><span class="n">1</span>Check the enclave, no key needed</p>
+                <div class="cmd-box"><code>npx github:oberiglabs-dev/oberig verify</code><button type="button" class="copy-btn" aria-label="Copy command 1 for PowerShell">Copy</button></div>
               </div>
               <div class="cmd">
                 <p class="cmd-label"><span class="n">2</span>Start it with your NEAR AI key</p>
-                <div class="cmd-box"><code>$env:NEARAI_API_KEY = "&lt;your key&gt;"; node bin/oberig.js</code><button type="button" class="copy-btn" aria-label="Copy command 2 for PowerShell">Copy</button></div>
+                <div class="cmd-box"><code>$env:NEARAI_API_KEY = "&lt;your key&gt;"; npx github:oberiglabs-dev/oberig</code><button type="button" class="copy-btn" aria-label="Copy command 2 for PowerShell">Copy</button></div>
+              </div>
+              <p class="cmd-hint">If PowerShell says running scripts is disabled, type npx.cmd instead of npx.</p>
+              <div class="cmd cmd-alt">
+                <p class="cmd-label">Or from a clone</p>
+                <div class="cmd-box"><code>git clone https://github.com/oberiglabs-dev/oberig; cd oberig; $env:NEARAI_API_KEY = "&lt;your key&gt;"; node bin/oberig.js</code><button type="button" class="copy-btn" aria-label="Copy the clone command for PowerShell">Copy</button></div>
               </div>
             </div>
             <div class="tabpanel" role="tabpanel" id="panel-sh" aria-labelledby="tab-sh" hidden>
               <div class="cmd">
-                <p class="cmd-label"><span class="n">1</span>Get Oberig</p>
-                <div class="cmd-box"><code>git clone https://github.com/oberiglabs-dev/oberig &amp;&amp; cd oberig</code><button type="button" class="copy-btn" aria-label="Copy command 1 for macOS and Linux">Copy</button></div>
+                <p class="cmd-label"><span class="n">1</span>Check the enclave, no key needed</p>
+                <div class="cmd-box"><code>npx github:oberiglabs-dev/oberig verify</code><button type="button" class="copy-btn" aria-label="Copy command 1 for macOS and Linux">Copy</button></div>
               </div>
               <div class="cmd">
                 <p class="cmd-label"><span class="n">2</span>Start it with your NEAR AI key</p>
-                <div class="cmd-box"><code>NEARAI_API_KEY="&lt;your key&gt;" node bin/oberig.js</code><button type="button" class="copy-btn" aria-label="Copy command 2 for macOS and Linux">Copy</button></div>
+                <div class="cmd-box"><code>NEARAI_API_KEY="&lt;your key&gt;" npx github:oberiglabs-dev/oberig</code><button type="button" class="copy-btn" aria-label="Copy command 2 for macOS and Linux">Copy</button></div>
+              </div>
+              <div class="cmd cmd-alt">
+                <p class="cmd-label">Or from a clone</p>
+                <div class="cmd-box"><code>git clone https://github.com/oberiglabs-dev/oberig &amp;&amp; cd oberig &amp;&amp; NEARAI_API_KEY="&lt;your key&gt;" node bin/oberig.js</code><button type="button" class="copy-btn" aria-label="Copy the clone command for macOS and Linux">Copy</button></div>
               </div>
             </div>
           </div>
-          <p class="note">Then point your agent at it from a second terminal. <code>node bin/oberig.js setup</code> prints the settings for Claude Code, Codex, OpenCode and other OpenAI-compatible tools.</p>
+          <p class="note">Then point your agent at it from a second terminal. This prints the settings for Claude Code, Codex, OpenCode and other OpenAI-compatible tools:</p>
+          <div class="cmd cmd-setup">
+            <div class="cmd-box"><code>npx github:oberiglabs-dev/oberig setup</code><button type="button" class="copy-btn" aria-label="Copy the setup command">Copy</button></div>
+          </div>
           <p class="sr-only" aria-live="polite" id="copy-status"></p>
         </div>
 
@@ -259,7 +271,7 @@
           <details name="faq">
             <summary>Which agents work?</summary>
             <div class="faq-a">
-              <p>Claude Code, through the Anthropic Messages endpoint with streaming and tool use. Codex, OpenCode and other OpenAI-compatible tools, through <code>/v1/chat/completions</code>. Every model request goes to NEAR AI Cloud, with no fallback to another provider.</p>
+              <p>Claude Code, through the Anthropic Messages endpoint with streaming and tool use. Codex, through the OpenAI Responses endpoint. OpenCode and other OpenAI-compatible tools, through <code>/v1/chat/completions</code>. Every model request goes to NEAR AI Cloud, with no fallback to another provider.</p>
             </div>
           </details>
           <details name="faq">

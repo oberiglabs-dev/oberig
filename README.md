@@ -21,16 +21,30 @@ NEAR AI Gateway (with its IronWire local proxy) gets your agent to NEAR AI priva
 
 ## Quick start
 
-You need a NEAR AI Cloud API key (cloud.near.ai: buy credits, then create a key). Oberig reads it from `NEARAI_API_KEY`, or from `NEAR_AI_API_KEY` if the first is not set. It never reads keys from files.
+You need Node.js 18.17 or newer and a NEAR AI Cloud API key (cloud.near.ai: buy credits, then create a key). Oberig reads the key from `NEARAI_API_KEY`, or from `NEAR_AI_API_KEY` if the first is not set. It never reads keys from files.
 
 **PowerShell**
+
+```powershell
+npx github:oberiglabs-dev/oberig verify
+$env:NEARAI_API_KEY = "<your key>"; npx github:oberiglabs-dev/oberig
+```
+
+**macOS / Linux**
+
+```sh
+npx github:oberiglabs-dev/oberig verify
+NEARAI_API_KEY="<your key>" npx github:oberiglabs-dev/oberig
+```
+
+The first line checks the NEAR AI enclave and needs no key. The second starts the gateway. The first time, npx asks once before it fetches Oberig from GitHub. If PowerShell says running scripts is disabled, type `npx.cmd` instead of `npx`.
+
+Or run it from a clone:
 
 ```powershell
 git clone https://github.com/oberiglabs-dev/oberig; cd oberig
 $env:NEARAI_API_KEY = "<your key>"; node bin/oberig.js
 ```
-
-**macOS / Linux**
 
 ```sh
 git clone https://github.com/oberiglabs-dev/oberig && cd oberig
@@ -58,17 +72,17 @@ Then point your agent at it (next section). Each request prints one metadata-onl
 
 The live dashboard is at `http://127.0.0.1:8790/`.
 
-`npm install -g .` in the repo folder gives you the `oberig` command. The rest of this README uses it.
+The rest of this README writes `oberig` for the command: that is `npx github:oberiglabs-dev/oberig`, or `node bin/oberig.js` in a clone, or `oberig` after `npm install -g .` in the repo folder.
 
 ### Try it without a key
 
 These need no NEAR AI key:
 
 ```sh
-node bin/oberig.js verify          # fetch a fresh attestation and print the enclave receipt
-node bin/oberig.js shield README.md
-node bin/oberig.js scrub ./some-traces
-node --test test/                  # 88 tests, offline (mocked NEAR AI server)
+npx github:oberiglabs-dev/oberig verify          # fetch a fresh attestation and print the enclave receipt
+npx github:oberiglabs-dev/oberig shield README.md
+npx github:oberiglabs-dev/oberig scrub ./some-traces
+node --test test/                                # in a clone: 94 tests, offline (mocked NEAR AI server)
 ```
 
 `oberig verify --chat` also sends one short test prompt and checks its signature. That needs a key and costs a tiny amount.
@@ -95,7 +109,7 @@ Optional: `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` turns off Claude Code's o
 
 ### Codex
 
-Codex talks to `/v1/chat/completions`. In `~/.codex/config.toml`:
+Codex speaks only the OpenAI Responses API. Oberig serves it at `/v1/responses`: each request becomes a Chat Completions request for NEAR AI, and the answer goes back as Responses events, so attestation, mask, shield and signature check work the same as for every other agent. In `~/.codex/config.toml` (the first two lines go above any `[section]`):
 
 ```toml
 model = "deepseek-ai/DeepSeek-V4.1-Flash-1017"
@@ -104,33 +118,34 @@ model_provider = "oberig"
 [model_providers.oberig]
 name = "Oberig"
 base_url = "http://127.0.0.1:8790/v1"
-wire_api = "chat"
 ```
 
-Oberig v0.1 serves Chat Completions only, not the Responses API, so `wire_api = "chat"` is required.
+No `env_key` and no `wire_api` line are needed: Oberig ignores the agent's key, and `responses` is the only wire API current Codex knows. Codex reads providers from this user file only, not from a project's `.codex/config.toml`. Hosted tools such as Codex's web search are left out, because NEAR AI Cloud runs only the model.
 
 ### OpenCode
 
-In `opencode.json`:
+OpenCode talks to `/v1/chat/completions`. In `opencode.json` (or `~/.config/opencode/opencode.json` for every project):
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "provider": {
+  "model": "oberig/deepseek-ai/DeepSeek-V4.1-Flash-1017",
+  "providers": {
     "oberig": {
-      "npm": "@ai-sdk/openai-compatible",
       "name": "Oberig",
-      "options": { "baseURL": "http://127.0.0.1:8790/v1" },
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": { "baseURL": "http://127.0.0.1:8790/v1" },
       "models": { "deepseek-ai/DeepSeek-V4.1-Flash-1017": {} }
     }
-  },
-  "model": "oberig/deepseek-ai/DeepSeek-V4.1-Flash-1017"
+  }
 }
 ```
 
+This is the OpenCode 2 shape. OpenCode 1.x uses `"provider"` with `"npm": "@ai-sdk/openai-compatible"` and `"options": { "baseURL": "http://127.0.0.1:8790/v1" }`, and OpenCode 2 still reads that older shape.
+
 ### Other tools
 
-Any OpenAI-compatible client: base URL `http://127.0.0.1:8790/v1`, any API key.
+Any OpenAI-compatible client: base URL `http://127.0.0.1:8790/v1` (Chat Completions or Responses), any API key.
 
 ---
 
@@ -183,7 +198,7 @@ The answer reaches your agent first; the signature check follows and lands in th
 - All instances of a model share one signing key. A signer match shows the attested key signed the answer, not which machine answered.
 - Preflight evidence plus one response signature is not yet a complete model-to-gateway-to-answer chain.
 - By default Oberig asks NEAR AI non-streaming, with the canonical model ID and `x-no-aliasing: true`, to get a model-level (`provider_tee`) signature, then streams to your agent locally. With `OBERIG_UPSTREAM_STREAM=1` it streams from NEAR AI and expects a gateway signature over the exact stream bytes. Which kind a given answer carries is shown in its receipt.
-- Tested live on 14 Nov 2026 against NEAR AI Cloud (DeepSeek V4.1 Flash 1017): `oberig verify --chat` passed every local attestation check and verified the test answer's signature with the model's TEE key, and a Claude Code style request through the gateway came back with 2 values masked, the signature verified and a seal.
+- Tested live on 14 Nov 2026 against NEAR AI Cloud (DeepSeek V4.1 Flash 1017): `oberig verify --chat` passed every local attestation check and verified the test answer's signature with the model's TEE key, and a Claude Code style request through the gateway came back with 2 values masked, the signature verified and a seal. OpenCode style Chat Completions requests (plain, streaming, with a tool) and a Codex style Responses tool loop (a function call, then its result) were tested the same day, and each answer's signature verified with the model's TEE key.
 
 `oberig verify` prints the receipt:
 
@@ -296,7 +311,8 @@ All settings come from the environment. There is no config file.
 |---|---|
 | `POST /v1/messages` | Anthropic Messages (Claude Code), streaming and tool use |
 | `POST /v1/messages/count_tokens` | local estimate, nothing is sent |
-| `POST /v1/chat/completions` | OpenAI Chat Completions (Codex, OpenCode, others), streaming and tool calls |
+| `POST /v1/responses` | OpenAI Responses (Codex), streaming and tool calls, translated locally to Chat Completions; nothing is stored, so `previous_response_id` is refused |
+| `POST /v1/chat/completions` | OpenAI Chat Completions (OpenCode, others), streaming and tool calls |
 | `GET /v1/models` | the configured model |
 | `GET /` | dashboard |
 | `GET /_oberig/state`, `GET /_oberig/events` | dashboard data (metadata only) |
@@ -322,9 +338,9 @@ Found a problem? Open an issue at https://github.com/oberiglabs-dev/oberig/issue
 node --test test/
 ```
 
-The tests cover translation and streaming, attestation checks on captured live NEAR AI reports (Ed25519 and ECDSA) and on synthetic reports with their own test certificate chain, response signatures (good, bad, wrong bytes, wrong signer), nonce mismatch, refusal when attestation is required, masking and restoring (also in tool-call arguments), shield detections and a no-false-positive README, scrub on a sample Claude Code transcript, routing through a mocked NEAR AI server, the security rules, and the CLI. Test keys are assembled from pieces at runtime; no real key appears in the source.
+The tests cover translation and streaming (Anthropic Messages and OpenAI Responses to Chat Completions), attestation checks on captured live NEAR AI reports (Ed25519 and ECDSA) and on synthetic reports with their own test certificate chain, response signatures (good, bad, wrong bytes, wrong signer), nonce mismatch, refusal when attestation is required, masking and restoring (also in tool-call arguments), shield detections and a no-false-positive README, scrub on a sample Claude Code transcript, routing through a mocked NEAR AI server, the security rules, and the CLI. Test keys are assembled from pieces at runtime; no real key appears in the source.
 
-Project layout: `bin/oberig.js` (CLI), `src/server.js` (gateway), `src/verify.js` and `src/quote.js` (attestation and signatures), `src/ecdsa.js` (keccak256, secp256k1), `src/mask.js`, `src/shield.js` (UMD), `src/translate.js`, `src/streams.js`, `src/receipt.js`, `src/scrub.js`, `src/seal.js` and `src/stitch.js` (seal and stitch renderers), `dashboard/index.html`.
+Project layout: `bin/oberig.js` (CLI), `src/server.js` (gateway), `src/verify.js` and `src/quote.js` (attestation and signatures), `src/ecdsa.js` (keccak256, secp256k1), `src/mask.js`, `src/shield.js` (UMD), `src/translate.js` (Claude Code), `src/responses.js` (Codex), `src/streams.js`, `src/receipt.js`, `src/scrub.js`, `src/seal.js` and `src/stitch.js` (seal and stitch renderers), `dashboard/index.html`.
 
 ## Credits
 
